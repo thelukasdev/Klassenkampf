@@ -655,6 +655,9 @@ class Server:
             await self._http_response(writer, 405, b'Method not allowed')
             return
         path = unquote(urlsplit(path).path)
+        if path.rstrip('/') in ('/impressum','/datenschutz'):
+            from legal_pages import serve
+            await serve(writer,method,path.strip('/'),Path(self.web_admin.store.path).parent);return
         if path == '/internal/status.json':
             await self._http_response(writer,404,b'Not found')
             return

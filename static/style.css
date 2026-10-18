@@ -165,3 +165,7 @@ body.touch .pad{display:block}
 .watch-link{display:block;padding:10px;margin-top:8px;border:1px solid #344149;border-radius:8px;color:#78e6ff;text-decoration:none;font-size:12px}#watchList h3{margin-top:22px}
 
 .account-nav{position:fixed;top:16px;right:18px;z-index:130;display:flex;gap:10px;font:12px var(--mono)}.account-nav a{padding:10px 12px;background:#10191eeb;color:#e8ece8;text-decoration:none;border:1px solid #344149;border-radius:8px}.account-nav a:last-child{border-color:#487348;color:#a9e9a4}.screen{padding-top:60px}body:has(#game.active) .account-nav{display:none}@media(max-width:600px){.account-nav{top:9px;right:9px;font-size:11px;gap:6px}.account-nav a{padding:8px 10px}}
+
+footer .legal-link{font-size:11px;color:#a9c8c0;text-decoration:none;margin-left:12px;white-space:nowrap}footer{flex-wrap:wrap}
+
+.public-status-footer{display:flex;justify-content:center;gap:6px;max-width:calc(100vw - 16px);flex-wrap:wrap;white-space:normal}.public-status-footer .legal-link{margin-left:0}.public-status-footer a{font-size:10px;padding:6px 8px}.screen{padding-bottom:76px}

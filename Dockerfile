@@ -9,6 +9,7 @@ RUN groupadd --gid 10001 game && useradd --uid 10001 --gid game --no-create-home
 COPY --chown=game:game *.py ./
 COPY --chown=game:game games/ ./games/
 COPY --chown=game:game static/ ./static/
+COPY --chown=game:game templates/ ./templates/
 USER 10001:10001
 EXPOSE 8080
 STOPSIGNAL SIGTERM

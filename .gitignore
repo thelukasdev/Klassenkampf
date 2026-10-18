@@ -29,3 +29,5 @@ compose.override.yml
 Thumbs.db
 .vscode/
 .idea/
+legal.json
+*.private.json

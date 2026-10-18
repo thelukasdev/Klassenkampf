@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 74 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 77 Tests geprüft.
 
 ## Anleitungen
 
@@ -84,3 +84,6 @@ Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter 
 - [Öffentlicher Status](OEFFENTLICHER-STATUS.md)
 
 Enthalten sind Quellcode, statische Assets, Tests und allgemeine Deployment-Dateien. Persönliche Konfiguration, Datenbanken, Nutzerkonten, Schlüssel, Logs und Sicherungen sind ausgeschlossen.
+
+## Impressum und Datenschutz
+Die öffentlichen Seiten `/impressum` und `/datenschutz` benötigen eine private, vollständige Betreiberkonfiguration in `/data/legal.json`. Vorlagen und Anleitung: [RECHTLICHE-SEITEN.md](RECHTLICHE-SEITEN.md). Persönliche Betreiberangaben sind nicht im Repository enthalten. Vor öffentlichem Betrieb eigene Angaben, Vertragsgrundlagen und tatsächliche Datenverarbeitung prüfen und die Konfiguration einrichten.
