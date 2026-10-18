@@ -1,0 +1,14 @@
+(() => {
+  const $=id=>document.getElementById(id);let user=null,current=null,busy=false;
+  async function api(path,body){const options={credentials:'same-origin',cache:'no-store'};if(body){options.method='POST';options.headers={'Content-Type':'application/json','X-CSRF-Token':user.csrf};options.body=JSON.stringify(body);}const r=await fetch('/api/player/'+path,options);if(r.status===401){location.replace('/login');throw Error('Bitte anmelden.');}const data=await r.json();if(!r.ok)throw Error(data.error||'Anfrage fehlgeschlagen.');return data;}
+  function notice(text){$('hostNotice').textContent=text;}
+  function expiry(){const deadline=current?.closes_at;if(!deadline){$('hostExpiry').textContent='';return;}const remaining=Math.max(0,Math.ceil(deadline-Date.now()/1000));$('hostExpiry').textContent=remaining?'Ohne Spieler geschlossen in '+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0'):'Wird geschlossen …';}
+  async function refresh(){try{const data=await api('overview');if(current&&!data.session)notice('Sitzung beendet.');current=data.session;$('hostCreate').hidden=!!current;$('hostSession').hidden=!current;if(current){$('hostSessionName').textContent=current.name;$('hostCode').textContent=current.code;$('hostJoin').href='/?code='+encodeURIComponent(current.code);$('hostCount').textContent=current.online+' verbunden · '+current.matches+' Partien';}expiry();}catch(error){notice(error.message);}}
+  async function action(name){if(busy)return;busy=true;$('hostStart').disabled=true;$('hostEnd').disabled=true;try{await api('action',{action:name,value:$('hostName').value.trim()||'Meine Sitzung',session:current?.id||''});notice(name==='create-session'?'Sitzung gestartet.':'Sitzung beendet.');await refresh();}catch(error){notice(error.message);}finally{busy=false;$('hostStart').disabled=false;$('hostEnd').disabled=false;}}
+  $('hostCreate').onsubmit=e=>{e.preventDefault();action('create-session');};
+  $('hostEnd').onclick=()=>{if(confirm('Sitzung für alle Spieler beenden?'))action('end-session');};
+  $('hostCopy').onclick=async()=>{if(!current)return;try{await navigator.clipboard.writeText(current.code);notice('Code kopiert.');}catch{notice('Code bitte manuell markieren und kopieren.');}};
+  $('hostLogout').onclick=async()=>{if(!user)return;try{const r=await fetch('/auth/player/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':user.csrf},body:'{}'});if(r.ok)location.replace('/');else notice('Abmelden fehlgeschlagen.');}catch{notice('Verbindung unterbrochen.');}};
+  api('me').then(data=>{user=data.user;if(!user){location.replace('/login');return;}refresh();}).catch(e=>notice(e.message));
+  setInterval(()=>{if(user&&!busy&&!document.hidden)refresh();},10000);setInterval(expiry,1000);
+})();

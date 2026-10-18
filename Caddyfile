@@ -1,0 +1,18 @@
+{$DOMAIN} {
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        X-Frame-Options DENY
+    }
+    @private path /internal /internal/*
+    handle @private {
+        respond 404
+    }
+    @status path /status /status/* /api/status /api/status/*
+    handle @status {
+        reverse_proxy status:8081
+    }
+    handle {
+        reverse_proxy app:8080
+    }
+}

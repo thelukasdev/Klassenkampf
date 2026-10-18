@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Klassenkampf</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav id="accountNav" class="account-nav" aria-label="Spielerkonto"><a href="/login">Anmelden</a><a href="/login#register">Registrieren</a></nav>
+
+<!-- Login -->
+<div id="login" class="screen active">
+  <h1 class="logo">KLASSEN<span class="w">KAMPF</span></h1>
+  <div class="sub">PBC MULTIPLAYER ARENA</div>
+  <div class="card">
+    <h2>Sitzungscode eingeben</h2>
+    <input id="codeInput" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC 234" aria-label="Sitzungscode">
+    <div style="height:12px"></div>
+    <button id="loginBtn" class="btn primary" style="width:100%">Anmelden</button>
+    <div style="height:8px"></div>
+    <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<!-- Nickname -->
+<div id="nick" class="screen">
+  <h1 class="logo">KLASSEN<span class="w">KAMPF</span></h1>
+  <div class="card">
+    <h2>Wie heißt du?</h2>
+    <input id="nickInput" type="text" class="nick" maxlength="16" placeholder="Dein Nickname" autocomplete="off">
+    <div style="height:12px"></div>
+    <button id="nickBtn" class="btn primary" style="width:100%">Los geht's</button>
+    <div style="height:8px"></div>
+    <div id="nickErr" class="err"></div>
+  </div>
+</div>
+
+<!-- Lobby -->
+<div id="lobby" class="screen">
+  <div class="topbar"><span id="sessionLabel" class="session-label"></span><button id="switchSession" class="btn session-switch" type="button">Sitzung wechseln</button>
+    <div class="me">Angemeldet als <b id="meNick">–</b></div>
+    <div>Credits: <span class="credits" id="meCred">0</span></div>
+  </div>
+  <div class="lobby-grid">
+    <div class="panel wide">
+      <h3>Rangliste</h3>
+      <div id="ranking" class="ranking"></div>
+    </div>
+    <div class="panel">
+      <div id="gameSelect">
+        <h3>1 · Spiel wählen</h3>
+        <div id="gameChips" class="games"></div>
+      </div>
+      <div id="modeNote" class="modenote hidden">Fordere einen Gegner heraus – das Spiel wird nach Annahme zufällig festgelegt.</div>
+      <div id="incoming"></div>
+      <div id="outgoing"></div>
+    </div>
+    <div class="panel">
+      <h3 id="challengeHead">2 · Gegner herausfordern</h3>
+      <div id="players" class="plist"></div>
+      <div id="watchList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Spiel -->
+<div id="game" class="screen">
+  <div class="gtop">
+    <div class="gtop-main">
+      <div class="vs" id="gVs"></div>
+      <button id="leaveBtn" class="btn mini">Aufgeben</button>
+    </div>
+    <div class="ghint" id="gHint"></div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="c" width="240" height="280"></canvas>
+    <div class="pad" id="pad">
+      <div class="pad-dirs">
+        <div class="tbtn d-up"    data-bit="4">▲</div>
+        <div class="tbtn d-left"  data-bit="1">◀</div>
+        <div class="tbtn d-right" data-bit="2">▶</div>
+        <div class="tbtn d-down"  data-bit="8">▼</div>
+      </div>
+      <div class="pad-ab">
+        <div class="tbtn round act-b" id="btnB" data-bit="32">B</div>
+        <div class="tbtn round act-a" id="btnA" data-bit="16">A</div>
+      </div>
+    </div>
+  </div>
+  <div id="overlay" class="overlay">
+    <div class="result">
+      <div id="resBig" class="big">–</div>
+      <div id="resReason" class="rr"></div>
+      <div>Credits: <span id="resCred" class="rc">0</span></div>
+      <div style="height:18px"></div>
+      <button id="backBtn" class="btn primary" style="width:100%">Zurück zur Lobby</button>
+    </div>
+  </div>
+</div>
+
+<footer class="public-status-footer"><a href="/status" target="_blank" rel="noopener">● Netzwerkstatus</a></footer>
+<div id="toast" class="toast"></div>
+
+<script src="jnb_assets.js"></script>
+<script src="render.js"></script>
+<script src="app.js"></script><script src="/account-nav.js"></script>
+</body>
+</html>

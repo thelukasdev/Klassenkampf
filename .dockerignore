@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+__pycache__
+*.pyc
+tests
+*.md
+*.zip
+*.json
+*.sqlite*
+*.db
+*.log
+data
+saves
+backups
+replays
+.venv

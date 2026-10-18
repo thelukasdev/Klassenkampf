@@ -1,0 +1,91 @@
+name: klassenkampf
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      KLASSENKAMPF_LOGIN_CODE: ${KLASSENKAMPF_LOGIN_CODE:?Run configure.py first}
+      KLASSENKAMPF_ADMIN_TOKEN: ${KLASSENKAMPF_ADMIN_TOKEN:?Run configure.py first}
+      KLASSENKAMPF_PUBLIC_ORIGIN: https://${DOMAIN:?Run configure.py first}
+      KLASSENKAMPF_STATUS_TOKEN: ${KLASSENKAMPF_STATUS_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      KLASSENKAMPF_OWNER_EMAIL: ${KLASSENKAMPF_OWNER_EMAIL:-}
+    volumes:
+      - game_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m
+    stop_grace_period: 15s
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).status == 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  status:
+    build: .
+    image: klassenkampf-app
+    command: [python, public_status.py]
+    restart: unless-stopped
+    init: true
+    environment:
+      KLASSENKAMPF_STATUS_TOKEN: ${KLASSENKAMPF_STATUS_TOKEN:-}
+      STATUS_TARGET: http://app:8080
+      STATUS_PUBLIC_ORIGIN: https://${DOMAIN:?Run configure.py first}
+    volumes:
+      - status_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 48m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8081/status/healthz', timeout=3).status == 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '2'
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Run configure.py first}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+volumes:
+  status_data:
+  game_data:
+  caddy_data:
+  caddy_config:

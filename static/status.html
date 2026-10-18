@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Netzwerkstatus · Klassenkampf</title><link rel="stylesheet" href="/status/status.css"></head>
+<body><header><a class="brand" href="/"><img src="/status/lp-logo.png" alt="LP" width="60" height="60"><span>KLASSENKAMPF<small>NETZWERKSTATUS</small></span></a><a class="button" href="/">Zum Spiel ↗</a></header>
+<main><section class="hero"><div><h1>Netzwerkstatus</h1></div><span id="updated">Verbindung wird hergestellt …</span></section>
+<section id="overall" class="overall unknown" aria-live="polite"><span class="dot"></span><div><h2 id="overallTitle">Status wird geprüft</h2><p id="overallText">Messdaten werden geladen.</p></div></section>
+<div class="toolbar"><label>Verlauf<select id="days"><option value="7">7 Tage</option><option value="30">30 Tage</option><option value="90" selected>90 Tage</option></select></label><button id="refresh" class="button">Aktualisieren ↻</button></div>
+<section><div class="section-heading"><h2>Dienste</h2><span id="uptime"></span></div><div id="services" class="services"></div></section>
+<section><div class="section-heading"><h2>Spielsitzungen</h2><label class="check"><input id="showEnded" type="checkbox"> Beendete anzeigen</label></div><div id="sessions" class="session-grid"></div></section>
+<section class="history-panel"><div class="section-heading"><h2>Statusverlauf</h2><label class="filter">Bereich<select id="historyFilter"><option value="">Alle Bereiche</option></select></label></div><div id="history"></div></section>
+<section class="status-notes"><div class="legend"><span class="operational">● Verfügbar</span><span class="degraded">● Beeinträchtigt</span><span class="down">● Ausfall</span><span class="unknown">● Unbekannt</span><span class="paused">● Pausiert</span></div><p id="monitoringSince"></p><p>Tageswerte: UTC · Unbekannte Zeit zählt nicht zur Verfügbarkeit.</p></section></main>
+<footer><a href="/">Spiel</a><a href="/admin">Verwaltung</a><a href="/status" aria-current="page">Netzwerkstatus</a><span>LP · KLASSENKAMPF</span></footer><script src="/status/status.js"></script></body></html>

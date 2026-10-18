@@ -1,0 +1,6 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meine Sitzung · Klassenkampf</title><link rel="stylesheet" href="/account.css"><link rel="stylesheet" href="/host.css"></head><body>
+<header><a href="/">← Zum Spiel</a><button id="hostLogout" class="text-button" type="button">Abmelden</button></header>
+<main class="account-card"><img class="account-logo" src="/lp-logo.png" alt="LP" width="160" height="160"><h1>Meine Sitzung</h1>
+<form id="hostCreate"><label for="hostName">Name (optional)</label><input id="hostName" maxlength="80" placeholder="Meine Sitzung"><button id="hostStart" type="submit">Sitzung starten</button></form>
+<section id="hostSession" hidden><h2 id="hostSessionName"></h2><code id="hostCode"></code><div class="host-actions"><button id="hostCopy" type="button">Code kopieren</button><a id="hostJoin" class="join-button" href="/">Beitreten ↗</a></div><p id="hostCount"></p><p id="hostExpiry"></p><button id="hostEnd" class="end-button" type="button">Sitzung beenden</button></section>
+<p id="hostNotice" role="status"></p><p class="host-policy">Eine Sitzung · 5 Minuten bis zum ersten Beitritt · Schließt nach 1 Minute ohne Spieler</p></main><footer><a href="/status">● Netzwerkstatus</a></footer><script src="/host.js"></script></body></html>
