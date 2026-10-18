@@ -23,3 +23,9 @@ Bestehende Partien vor dem Update können nicht nachträglich aufgezeichnet werd
 Die Dateien liegen im bestehenden persistenten Spiel-Volume unter `/data/replays`, die Metadaten in `/data/admin.sqlite3`. Öffentliche statische Routen liefern diese Dateien nicht aus. Die Spielstand-Sicherung einzelner Sitzungen enthält keine Replay-Dateien; vollständige Server-Backups müssen Datenbank und Replay-Verzeichnis zusammen sichern. Der unabhängige Statusverlauf bleibt separat.
 
 Schreibarbeit erfolgt über begrenzte Hintergrundwarteschlangen. Ein Speicherausfall beendet die Aufzeichnung, nicht das Spiel. Nach einem ungeplanten Neustart werden bereits geschriebene Chunks als Teilaufnahme gerettet; der noch nicht geschriebene letzte Puffer kann fehlen. Reguläres Herunterfahren wartet auf das Abschließen der Aufnahmen.
+
+## Replay-Freigabelinks
+
+Im geöffneten Replay: **Freigabelink erstellen** → **Link kopieren**. Jeder mit dem Link kann beide Ansichten sehen und JSON herunterladen. **Neuen Link erstellen** rotiert den Schlüssel, **Freigabe beenden** widerruft den Zugriff. Rechte wie beim Replay-Abruf (nur berechtigte eigene/zugewiesene Sitzungen).
+
+512 Bit Zufall (`secrets.token_urlsafe(64)`, 86 Zeichen), nur SHA-256-Hash in SQLite. URL-Fragment statt Query/Pfad; API über `X-Replay-Token`, ohne Cookies. Keine öffentliche Auflistung; `noindex` und `no-referrer`. Freigaben überstehen Neustarts, enden aber mit Widerruf, Rotation oder Ablauf/Löschung der Aufnahme (regulär sieben Tage). Heruntergeladene Kopien lassen sich nicht zurückrufen.

@@ -613,7 +613,16 @@ class Server:
             k, _, v = line.decode("latin1").partition(":")
             headers[k.strip().lower()] = v.strip()
 
-        if urlsplit(path).path=='/api/watch':
+        if urlsplit(path).path=='/api/replay-share':
+            try:
+                if method!='GET':raise ValueError('Replay nicht verfügbar')
+                query=__import__('urllib.parse',fromlist=['parse_qs']).parse_qs(urlsplit(path).query)
+                index=int(query['chunk'][0]) if 'chunk' in query else None
+                result=await asyncio.to_thread(self.replays.shared,headers.get('x-replay-token',''),index)
+                await self.web_admin.respond(writer,200,{'result':result})
+            except (ValueError,OSError):
+                await self.web_admin.respond(writer,404,{'error':'Replay nicht verfügbar oder Freigabe beendet.'})
+        elif urlsplit(path).path=='/api/watch':
             token=headers.get('x-spectator-token','')
             match=None
             if method=='GET' and 20<=len(token)<=64 and self.session_hub:
@@ -670,6 +679,7 @@ class Server:
             path='/host.html'
         if path in ('/login','/login/'):
             path='/login.html'
+        if path in ('/replay','/replay/'):path='/shared-replay.html'
         if path in ('/watch','/watch/'):
             path='/watch.html'
         if path in ('/admin', '/admin/'):

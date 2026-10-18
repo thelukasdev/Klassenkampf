@@ -3,3 +3,5 @@
 footer .legal-link{font-size:11px;color:#a9c8c0;text-decoration:none;margin-left:12px;white-space:nowrap}footer{flex-wrap:wrap}
 
 footer{display:flex;justify-content:center;gap:12px}footer .legal-link{margin-left:0}
+
+#replaySharePanel{margin-top:14px;padding:12px;border:1px solid #344149;border-radius:8px;font-size:12px;line-height:1.6}#replayShareUrl{display:block;width:100%;margin:10px 0;font-size:12px}body.watch-page .replay-dialog{color:#e8ece8;background:#101813;border:1px solid #344149;border-radius:16px;padding:20px}

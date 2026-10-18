@@ -1,5 +1,6 @@
 """Bounded, chunked snapshot recordings. Authentication stays in WebAdmin."""
 import asyncio
+import hashlib
 import gzip
 import json
 from pathlib import Path
@@ -22,6 +23,7 @@ class ReplayLibrary:
                 game TEXT NOT NULL,name TEXT NOT NULL,players TEXT NOT NULL,started INTEGER NOT NULL,
                 ended INTEGER,duration REAL NOT NULL,frames INTEGER NOT NULL,segments TEXT NOT NULL,
                 bytes INTEGER NOT NULL,truncated INTEGER NOT NULL,reason TEXT NOT NULL)''')
+            db.execute('CREATE TABLE IF NOT EXISTS replay_shares(replay_id TEXT PRIMARY KEY,token_hash TEXT UNIQUE NOT NULL)')
             db.execute("UPDATE replays SET ended=?,truncated=1,reason='interrupted' WHERE ended IS NULL",(int(time.time()),))
         self.cleanup()
 
@@ -45,6 +47,7 @@ class ReplayLibrary:
                             for f in path.glob('*.json.gz'):f.unlink(missing_ok=True)
                             try:path.rmdir()
                             except OSError:pass
+                        db.execute('DELETE FROM replay_shares WHERE replay_id=?',(row['id'],))
                         db.execute('DELETE FROM replays WHERE id=?',(row['id'],))
 
     def start(self,match):
@@ -58,8 +61,8 @@ class ReplayLibrary:
     def metadata(self,room_id,rid=None):
         with self.store.connect() as db:
             if rid:
-                rows=db.execute('SELECT * FROM replays WHERE room_id=? AND id=? AND ended IS NOT NULL AND ended>=?',(room_id,rid,int(time.time())-RETENTION)).fetchall()
-            else:rows=db.execute('SELECT * FROM replays WHERE room_id=? AND ended IS NOT NULL AND ended>=? ORDER BY started DESC LIMIT 100',(room_id,int(time.time())-RETENTION)).fetchall()
+                rows=db.execute('SELECT *,EXISTS(SELECT 1 FROM replay_shares s WHERE s.replay_id=replays.id) AS shared FROM replays WHERE room_id=? AND id=? AND ended IS NOT NULL AND ended>=?',(room_id,rid,int(time.time())-RETENTION)).fetchall()
+            else:rows=db.execute('SELECT *,EXISTS(SELECT 1 FROM replay_shares s WHERE s.replay_id=replays.id) AS shared FROM replays WHERE room_id=? AND ended IS NOT NULL AND ended>=? ORDER BY started DESC LIMIT 100',(room_id,int(time.time())-RETENTION)).fetchall()
         result=[]
         for row in rows:
             item=dict(row);item['players']=json.loads(item['players']);item['segments']=json.loads(item['segments']);result.append(item)
@@ -73,6 +76,27 @@ class ReplayLibrary:
                 raw=f.read(4*1024*1024+1)
             if len(raw)>4*1024*1024:raise ValueError('Replay zu gross')
             return json.loads(raw)
+
+    def share(self,room_id,rid,revoke=False):
+        with self.lock:
+            if not self.metadata(room_id,rid):raise ValueError('Replay nicht gefunden')
+            token=secrets.token_urlsafe(64)
+            with self.store.connect() as db:
+                db.execute('DELETE FROM replay_shares WHERE replay_id=?',(rid,))
+                if not revoke:db.execute('INSERT INTO replay_shares VALUES(?,?)',(rid,hashlib.sha256(token.encode()).hexdigest()))
+            return None if revoke else token
+
+    def shared(self,token,index=None):
+        if not re.fullmatch(r'[A-Za-z0-9_-]{86}',token):raise ValueError('Replay nicht verfügbar')
+        with self.lock:
+            with self.store.connect() as db:
+                row=db.execute('SELECT r.room_id,r.id FROM replay_shares s JOIN replays r ON r.id=s.replay_id WHERE s.token_hash=?',
+                               (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+            if not row:raise ValueError('Replay nicht verfügbar')
+            meta=self.metadata(row['room_id'],row['id'])
+            if not meta:raise ValueError('Replay nicht verfügbar')
+            if index is not None:return self.chunk(row['room_id'],row['id'],index)
+            return {k:meta[k] for k in ('id','game','name','players','started','duration','segments','truncated','reason')}
 
     def track(self,task):
         self.tasks.add(task);task.add_done_callback(self.tasks.discard)

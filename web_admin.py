@@ -324,7 +324,13 @@ class WebAdmin:
                 raise ValueError('Ungueltige Anfrage')
             action, value = obj.get('action'), str(obj.get('value',''))
             if session['role']=='host' and not self.player_auth.permissions.permits(self.player_auth.permissions.get(session['email']),action):raise Denied('Diese Aktion ist nicht freigegeben.')
-            if action=='resolve-report':
+            if action in ('share-replay','revoke-replay'):
+                room_id=str(obj.get('session',''))
+                self.store.check_room(session,room_id)
+                key=self.server.replays.share(room_id,value,action=='revoke-replay')
+                self.store.log(session['email'],action,room_id+' '+value)
+                result={'url':self.origin+'/replay#'+key} if key else {'revoked':True}
+            elif action=='resolve-report':
                 self.reports.resolve(session,value,obj.get('resolved'))
                 result='Meldung aktualisiert.'
             elif action=='player-permissions':
@@ -366,7 +372,7 @@ class WebAdmin:
                     self.password_auth.mfa.reset(email)
                     with self.store.connect() as db:
                         db.execute('DELETE FROM admin_passwords WHERE email=?',(email,))
-                result='Zugriff aktualisiert'
+                result='Zugriff aktualisiert' 
             elif action in ('kick','ban','unban','reset-credits','mode','save','load','create-session','end-session',
                             'rules','pause-match','end-match','remove-player','move-player','spectators'):
                 if self.server.session_hub:
@@ -406,3 +412,4 @@ class WebAdmin:
             # Do not log codes, tokens or OAuth request URLs.
             logging.error('Web administration request failed (%s)', route)
             await self.respond(writer, 503, {'error':'Anmeldung oder Verwaltung momentan nicht erreichbar.'})
+

@@ -80,3 +80,42 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(m.finished)
         meta=self.app.replays.metadata(self.r.room_id,m.recorder.id)
         self.assertTrue(meta['truncated']);self.assertEqual(meta['reason'],'storage_error')
+
+    async def test_share_scope_csrf_rotation_revocation_and_public_payload(self):
+        m=await self.match();await self.r.control.cancel_match(m);await self.app.replays.drain()
+        rid=m.recorder.id;obj={'action':'share-replay','session':self.r.room_id,'value':rid}
+        self.assertIn(b'401',await self.http('/api/admin/action',method='POST',data=obj))
+        headers=self.headers('guide@example.org');bad={**headers,'X-CSRF-Token':'wrong'}
+        self.assertIn(b'403',await self.http('/api/admin/action',method='POST',data=obj,extra_headers=bad))
+        self.assertIn(b'403',await self.http('/api/admin/action',method='POST',data={**obj,'session':self.b['id']},extra_headers=headers))
+        response=await self.http('/api/admin/action',method='POST',data=obj,extra_headers=headers)
+        url=self.body(response)['result']['url'];token=url.split('#')[1]
+        self.assertEqual(len(token),86);self.assertNotIn('?',url)
+        with self.app.web_admin.store.connect() as db:
+            row=db.execute('SELECT token_hash FROM replay_shares WHERE replay_id=?',(rid,)).fetchone()
+            self.assertEqual(row['token_hash'],self.app.web_admin.store.digest(token));self.assertNotEqual(row['token_hash'],token)
+        async def public(key,extra=''):
+            return await self.http('/api/replay-share'+extra,extra_headers={'X-Replay-Token':key})
+        for key in ('',token[:-1],token+'a','x'*86):self.assertIn(b'404',await public(key))
+        self.assertIn(b'404',await self.http('/api/replay-share?token='+token))
+        response=await public(token);self.assertIn(b'200',response);self.assertIn(b'Cache-Control: no-store',response)
+        meta=self.body(response)['result'];self.assertNotIn('room_id',meta);self.assertNotIn('token_hash',meta)
+        self.assertIn(b'200',await public(token,'?chunk=0'));self.assertIn(b'404',await public(token,'?chunk=-1'))
+        newer=self.body(await self.http('/api/admin/action',method='POST',data=obj,extra_headers=headers))['result']['url'].split('#')[1]
+        self.assertNotEqual(newer,token);self.assertIn(b'404',await public(token));self.assertIn(b'200',await public(newer))
+        revoke={**obj,'action':'revoke-replay'}
+        self.assertIn(b'200',await self.http('/api/admin/action',method='POST',data=revoke,extra_headers=headers))
+        self.assertIn(b'404',await public(newer))
+
+    async def test_share_expires_with_recording_and_player_permission(self):
+        from player_permissions import DEFAULTS,PlayerPermissions
+        self.assertFalse(PlayerPermissions.permits(DEFAULTS,'share-replay'))
+        self.assertTrue(PlayerPermissions.permits({**DEFAULTS,'view_replays':True},'share-replay'))
+        m=await self.match('wnr');await self.r.control.cancel_match(m);await self.app.replays.drain();rid=m.recorder.id
+        token=self.app.replays.share(self.r.room_id,rid)
+        self.assertEqual(self.app.replays.shared(token)['game'],'wnr')
+        self.assertEqual(set(self.app.replays.shared(token,0)[0]['views']),{'1','2'})
+        with self.app.web_admin.store.connect() as db:db.execute('UPDATE replays SET ended=? WHERE id=?',(int(time.time())-8*86400,rid))
+        with self.assertRaises(ValueError):self.app.replays.shared(token)
+        self.app.replays.cleanup()
+        with self.app.web_admin.store.connect() as db:self.assertIsNone(db.execute('SELECT 1 FROM replay_shares WHERE replay_id=?',(rid,)).fetchone())

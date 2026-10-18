@@ -10,6 +10,7 @@ ACTIONS = {
     'reset-credits': 'moderate_players', 'remove-player': 'moderate_players',
     'move-player': 'moderate_players', 'mode': 'manage_games', 'rules': 'manage_games',
     'pause-match': 'manage_games', 'end-match': 'manage_games', 'spectators': 'manage_games',
+    'share-replay': 'view_replays', 'revoke-replay': 'view_replays',
     'save': 'manage_saves', 'load': 'manage_saves',
 }
 
