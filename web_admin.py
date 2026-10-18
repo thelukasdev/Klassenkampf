@@ -372,7 +372,7 @@ class WebAdmin:
                     self.password_auth.mfa.reset(email)
                     with self.store.connect() as db:
                         db.execute('DELETE FROM admin_passwords WHERE email=?',(email,))
-                result='Zugriff aktualisiert' 
+                result='Zugriff aktualisiert'
             elif action in ('kick','ban','unban','reset-credits','mode','save','load','create-session','end-session',
                             'rules','pause-match','end-match','remove-player','move-player','spectators'):
                 if self.server.session_hub:
@@ -412,4 +412,3 @@ class WebAdmin:
             # Do not log codes, tokens or OAuth request URLs.
             logging.error('Web administration request failed (%s)', route)
             await self.respond(writer, 503, {'error':'Anmeldung oder Verwaltung momentan nicht erreichbar.'})
-
