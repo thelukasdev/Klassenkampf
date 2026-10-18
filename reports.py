@@ -18,8 +18,16 @@ class Reports:
                 id INTEGER PRIMARY KEY,reference TEXT UNIQUE NOT NULL,created INTEGER NOT NULL,
                 page TEXT NOT NULL,description TEXT NOT NULL,resolved INTEGER NOT NULL DEFAULT 0)''')
 
+    def session(self,headers):
+        player=self.web.player_auth.session(headers)
+        if player:return player
+        admin=self.store.session(self.web.cookie(headers,self.web.COOKIE))
+        return admin if admin and admin['role'] in ('owner','admin','guide') else None
+
     async def handle(self,reader,writer,method,route,headers):
         w=self.web
+        if not self.session(headers):
+            await w.respond(writer,401,{'error':'Bitte anmelden.'});return
         if route=='/auth/report/csrf' and method=='GET':
             csrf=secrets.token_urlsafe(32)
             await w.respond(writer,200,{'csrf':csrf},cookie=(self.COOKIE,csrf,900));return
@@ -40,6 +48,8 @@ class Reports:
         ip=headers.get('x-forwarded-for','local').split(',')[-1].strip()
         w.player_auth.hit('report:'+hashlib.sha256(ip.encode()).hexdigest(),5,900)
         w.player_auth.hit('report:global',100,3600)
+        if not self.session(headers):
+            await w.respond(writer,401,{'error':'Bitte erneut anmelden.'});return
         reference='KK-'+secrets.token_hex(6).upper()
         with self.store.connect() as db:
             db.execute('INSERT INTO issue_reports(reference,created,page,description) VALUES(?,?,?,?)',

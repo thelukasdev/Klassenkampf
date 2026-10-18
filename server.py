@@ -648,9 +648,9 @@ class Server:
                 return
             await self._do_websocket(reader, writer, headers)
         else:
-            await self._serve_http(writer, method, path)
+            await self._serve_http(writer, method, path, headers)
 
-    async def _serve_http(self, writer, method, path):
+    async def _serve_http(self, writer, method, path, headers=None):
         if method not in ('GET', 'HEAD'):
             await self._http_response(writer, 405, b'Method not allowed')
             return
@@ -658,7 +658,7 @@ class Server:
         if path == '/internal/status.json':
             await self._http_response(writer,404,b'Not found')
             return
-        if path=='/report':path='/report.html'
+        if path in ('/report','/report/'):path='/report.html'
         if path in ('/account/security','/account/security/'):
             path='/security.html'
         if path in ('/account/manage','/account/manage/'):
@@ -680,6 +680,8 @@ class Server:
         if '\\' in safe or '..' in Path(safe).parts or '\x00' in safe:
             await self._http_response(writer, 404, b'Not found')
             return
+        if Path(safe).name.lower()=='report.html' and not self.web_admin.reports.session(headers or {}):
+            await self.web_admin.respond(writer,303,location='/login');return
         body = None
         ext = os.path.splitext(safe)[1]
         if _EMBED is not None:                     # Single-File-Build

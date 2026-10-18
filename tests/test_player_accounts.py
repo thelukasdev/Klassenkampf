@@ -287,8 +287,9 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM player_resets').fetchone()[0],0)
 
     async def test_manual_reports_private_access_resolution_and_input_protection(self):
-        r=await self.http('/auth/report/csrf');csrf=self.body(r)['csrf'];report=self.app.web_admin.reports
-        headers={'Origin':'https://games.example.org','Content-Type':'application/json','X-CSRF-Token':csrf,'Cookie':report.COOKIE+'='+self.cookie(r,report.COOKIE),'X-Forwarded-For':'192.0.2.5'}
+        owner,_=self.admin_headers()
+        r=await self.http('/auth/report/csrf',extra_headers=owner);csrf=self.body(r)['csrf'];report=self.app.web_admin.reports
+        headers={'Origin':'https://games.example.org','Content-Type':'application/json','X-CSRF-Token':csrf,'Cookie':owner['Cookie']+'; '+report.COOKIE+'='+self.cookie(r,report.COOKIE),'X-Forwarded-For':'192.0.2.5'}
         data={'page':'/','description':'Die Spielrunde bleibt beim Start hängen.'}
         self.assertIn(b'403',await self.http('/auth/report/submit',method='POST',extra_headers={**headers,'Origin':'https://evil.test'},data=data))
         self.assertIn(b'400',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data={**data,'page':'/?code=PRIVATE'}))
@@ -324,3 +325,24 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         second=self.body(await self.http('/api/admin/reports?state=all&before='+str(first['next']),extra_headers=owner))
         self.assertEqual(len(first['reports']),25);self.assertEqual(len(second['reports']),6)
         self.assertIsNone(second['next']);self.assertEqual(len({r['id'] for r in first['reports']+second['reports']}),31)
+
+    async def test_reporting_requires_full_active_login_including_direct_page_and_stale_csrf(self):
+        self.assertIn(b'401',await self.http('/auth/report/csrf'))
+        self.assertIn(b'401',await self.http('/auth/report/submit',method='POST',data={'page':'/','description':'Guest must not submit'}))
+        for path in ('/report','/report/','/report.html','/%72eport.html','/./report.html'):
+            r=await self.http(path);self.assertIn(b'303',r);self.assertIn(b'Location: /login',r);self.assertNotIn(b'id="reportForm"',r)
+        player,token,*_=await self.signup()
+        self.assertIn(b'200',await self.http('/report',extra_headers=player))
+        forged={'Cookie':self.app.web_admin.COOKIE+'='+token}
+        self.assertIn(b'401',await self.http('/auth/report/csrf',extra_headers=forged))
+        r=await self.http('/auth/report/csrf',extra_headers=player);self.assertIn(b'200',r)
+        report=self.app.web_admin.reports
+        headers={**player,'X-CSRF-Token':self.body(r)['csrf'],'Cookie':player['Cookie']+'; '+report.COOKIE+'='+self.cookie(r,report.COOKIE)}
+        self.assertIn(b'200',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data={'page':'/account','description':'An authenticated player report'}))
+        with self.auth.store.connect() as db:db.execute('DELETE FROM sessions WHERE token=?',(self.auth.store.digest(token),))
+        self.assertIn(b'401',await self.http('/auth/report/csrf',extra_headers=headers))
+        self.assertIn(b'401',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data={'page':'/account','description':'Stale report token after logout'}))
+        self.assertIn(b'303',await self.http('/report.html',extra_headers=headers))
+        guide,_=self.admin_headers('guide')
+        self.assertIn(b'200',await self.http('/report',extra_headers=guide))
+        self.assertIn(b'200',await self.http('/auth/report/csrf',extra_headers=guide))
