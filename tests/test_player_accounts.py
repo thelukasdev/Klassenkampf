@@ -70,13 +70,17 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         wrong='000000' if code!='000000' else '111111'
         for _ in range(5):self.assertIn(b'400',await self.http('/auth/player/verify',method='POST',extra_headers=h,data={'code':wrong}))
         self.assertIn(b'400',await self.http('/auth/player/verify',method='POST',extra_headers=h,data={'code':code}))
-    async def test_each_login_needs_email_and_logout_revokes_player_cookie(self):
+    async def test_verified_account_login_needs_only_password_and_logout_revokes_cookie(self):
         h,token,*_=await self.signup();self.assertIn(b'200',await self.http('/auth/player/logout',method='POST',extra_headers=h,data={}))
         self.assertIsNone(self.auth.store.session(token));pre=await self.preauth()
         response=await self.http('/auth/player/login',method='POST',extra_headers=pre,data={'email':'owner@example.org','password':'wrong'})
         self.assertIn(b'401',response)
-        response=await self.http('/auth/player/login',method='POST',extra_headers=pre,data={'email':'owner@example.org','password':'test-player-password-123'})
-        self.assertIn(b'200',response);self.assertNotIn((self.auth.COOKIE+'=').encode(),response)
+        self.sender.reset_mock()
+        with patch.dict(os.environ,{'SMTP_PASSWORD':''}):
+            response=await self.http('/auth/player/login',method='POST',extra_headers=pre,data={'email':'owner@example.org','password':'test-player-password-123'})
+        self.assertIn(b'200',response);self.assertIn((self.auth.COOKIE+'=').encode(),response)
+        self.assertEqual(self.body(response)['stage'],'authenticated');self.sender.assert_not_called()
+        self.assertIsNotNone(self.auth.store.session(self.cookie(response,self.auth.COOKIE)))
         self.assertIn(b'401',await self.http('/api/player/overview'))
     async def test_delivery_failure_does_not_create_account_or_pending_session(self):
         h=await self.preauth();self.sender.side_effect=OSError('mail service unavailable')
@@ -184,7 +188,7 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM player_accounts').fetchone()[0],1)
             self.assertEqual(db.execute('SELECT count(*) FROM player_codes').fetchone()[0],0)
 
-    async def test_inflight_old_password_login_cannot_issue_code_after_reset(self):
+    async def test_inflight_old_password_login_cannot_issue_session_after_reset(self):
         import asyncio,threading
         from password_auth import PasswordAuth
         await self.signup();h=await self.preauth();started=threading.Event();release=threading.Event();task=None
@@ -346,3 +350,13 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         guide,_=self.admin_headers('guide')
         self.assertIn(b'200',await self.http('/report',extra_headers=guide))
         self.assertIn(b'200',await self.http('/auth/report/csrf',extra_headers=guide))
+
+    async def test_unconfirmed_registration_cannot_login_and_confirmation_remains_required(self):
+        h=await self.preauth();data={'email':'unconfirmed@example.org','password':'unconfirmed-password-123'}
+        self.assertIn(b'200',await self.http('/auth/player/register',method='POST',extra_headers=h,data=data))
+        response=await self.http('/auth/player/login',method='POST',extra_headers=h,data=data)
+        self.assertIn(b'401',response);self.assertNotIn((self.auth.COOKIE+'=').encode(),response)
+        with patch.dict(os.environ,{'SMTP_PASSWORD':''}):
+            response=await self.http('/auth/player/csrf')
+            self.assertTrue(self.body(response)['ready']);self.assertFalse(self.body(response)['mail_ready'])
+            self.assertIn(b'503',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':data['email']}))

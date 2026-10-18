@@ -1,6 +1,6 @@
 # Verwaltung mit E-Mail und Passwort
 
-Die Verwaltung unter `/admin` verwendet E-Mail, Passwort und verpflichtende Authenticator-2FA. Google ist deaktiviert. Spielerkonten verwenden ein separates Passwort und E-Mail-Codes; siehe [SPIELERKONTEN.md](SPIELERKONTEN.md).
+Die Verwaltung unter `/admin` verwendet E-Mail, Passwort und verpflichtende Authenticator-2FA. Google ist deaktiviert. Spielerkonten verwenden ein separates Passwort und bestätigen ihre E-Mail nur bei Registrierung und Passwortreset; siehe [SPIELERKONTEN.md](SPIELERKONTEN.md).
 
 ## Ersten Zugang einrichten
 

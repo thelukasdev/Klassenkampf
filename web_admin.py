@@ -227,7 +227,7 @@ class WebAdmin:
             session = self.player_auth.session(headers) if player_scope else self.store.session(token)
             if session and not player_scope and session['role']=='host':session=None
             if route == '/api/admin/me' and method == 'GET':
-                await self.respond(writer, 200, {'user': session, 'login_ready': self.player_auth.ready if player_scope else self.password_auth.ready})
+                await self.respond(writer, 200, {'user': session, 'login_ready': True if player_scope else self.password_auth.ready})
                 return
             if not session:
                 await self.respond(writer, 401, {'error':'Bitte mit E-Mail-Adresse und Passwort anmelden.'})

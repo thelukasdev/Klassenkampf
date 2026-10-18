@@ -6,7 +6,7 @@ Browser-Minispiele mit parallelen Spielsitzungen, Webverwaltung und öffentliche
 
 - Neun Minispiele: Bomber, Connect4, Dots, Duel, Jump’n’Bump, Pong, Tanks, Tron und WnR.
 - Getrennte Spielräume mit sechsstelligen Beitrittscodes und eigenen Spielern und Ergebnissen.
-- Spielerkonten mit E-Mail-Bestätigung, Passwort und E-Mail-Code bei jeder Anmeldung; Passwortreset per E-Mail.
+- Spielerkonten mit einmaliger E-Mail-Bestätigung bei der Registrierung; spätere Anmeldung nur mit Passwort. Passwortreset weiterhin per E-Mail-Code.
 - Ein aktiver Spielraum je Spielerkonto, automatische Schließung nach fünf Minuten ohne ersten Beitritt oder einer Minute nach dem letzten Spieler.
 - Verwaltung mit Authenticator-2FA, Rollen, Kontenverwaltung, Spielsteuerung, Ergebnissen und Sicherungen.
 - Pro Spielerkonto schaltbare Zusatzrechte, eigene erweiterte Verwaltung und einstellbare Sitzungslimits.
@@ -36,7 +36,7 @@ SMTP_FROM=spiele@example.org
 SMTP_PASSWORD=HIER_DAS_MAILPASSWORT_EINTRAGEN
 ```
 
-Die automatisch erzeugten Token beibehalten. Eine vorhandene `.env` wird nicht überschrieben. SMTP-Port 587 verwendet STARTTLS, Port 465 TLS. Ohne Mailkonfiguration sind Registrierung und Spieleranmeldung nicht verfügbar. Der separate Verwaltungszugang benötigt keine E-Mail-Codes.
+Die automatisch erzeugten Token beibehalten. Eine vorhandene `.env` wird nicht überschrieben. SMTP-Port 587 verwendet STARTTLS, Port 465 TLS. Registrierung und Passwortreset benötigen Mailversand; die Passwortanmeldung bestätigter Konten funktioniert auch ohne Mailkonfiguration. Der separate Verwaltungszugang benötigt keine E-Mail-Codes.
 
 ```sh
 docker compose config --quiet
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 73 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 74 Tests geprüft.
 
 ## Anleitungen
 

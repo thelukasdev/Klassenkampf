@@ -1,4 +1,4 @@
-"""Player hosts: password plus one-use email codes, separate from admin MFA."""
+"""Player accounts: verified registration, password login and email password recovery."""
 import asyncio
 from email.message import EmailMessage
 from email.utils import parseaddr
@@ -58,7 +58,7 @@ class PlayerAuth:
         self.deliver(email,code,True)
 
     def deliver(self,email,code,reset):
-        msg=EmailMessage();msg['From']=os.environ['SMTP_FROM'];msg['To']=email;msg['Subject']='Klassenkampf: Passwort zurücksetzen' if reset else 'Dein Klassenkampf-Anmeldecode'
+        msg=EmailMessage();msg['From']=os.environ['SMTP_FROM'];msg['To']=email;msg['Subject']='Klassenkampf: Passwort zurücksetzen' if reset else 'Klassenkampf: E-Mail bestätigen'
         msg.set_content(('Code zum Zurücksetzen deines Passworts: ' if reset else 'Dein Bestätigungscode: ')+code+'\n\nDer Code ist 5 Minuten gültig und kann einmal verwendet werden.\nWenn du diese Anfrage nicht gestartet hast, ignoriere diese E-Mail.\n\nKlassenkampf\n'+self.web.origin)
         port=int(os.environ.get('SMTP_PORT','465'));host=os.environ['SMTP_HOST']
         if port==465:
@@ -87,6 +87,7 @@ class PlayerAuth:
         with self.store.connect() as db:
             row=db.execute('SELECT * FROM player_codes WHERE token=?',(self.store.digest(token),)).fetchone()
             if not row or row['expires']<=now or row['attempts']>=5:raise ValueError('Code ungültig oder abgelaufen.')
+            if not row['password']:raise ValueError('Code ungültig oder abgelaufen.')
             valid=secrets.compare_digest(self.store.digest(token+':'+str(code)),row['hash'])
             db.execute('UPDATE player_codes SET attempts=attempts+1 WHERE token=?',(self.store.digest(token),))
         if not valid:raise ValueError('Code ungültig oder abgelaufen.')
@@ -167,7 +168,7 @@ class PlayerAuth:
     async def handle(self,reader,writer,method,route,headers):
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
-            token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':self.ready},cookie=(self.CSRF,token,600));return
+            token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready},cookie=(self.CSRF,token,600));return
         if route=='/auth/player/change-password' and method=='POST':
             session=self.session(headers)
             if not session or headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Bitte erneut anmelden.')
@@ -187,7 +188,7 @@ class PlayerAuth:
             await w.respond(writer,404,{'error':'Nicht gefunden'});return
         csrf=w.cookie(headers,self.CSRF)
         if not csrf or headers.get('origin')!=w.origin or not secrets.compare_digest(csrf.encode(),headers.get('x-csrf-token','').encode()):raise Denied('Seite bitte neu laden.')
-        if not self.ready:
+        if route in ('/auth/player/register','/auth/player/reset-request') and not self.ready:
             await w.respond(writer,503,{'error':'E-Mail-Anmeldung momentan nicht verfügbar.'});return
         if headers.get('transfer-encoding') or headers.get('content-type','').split(';')[0]!='application/json':raise ValueError('JSON erforderlich')
         length=int(headers.get('content-length','0'))
@@ -225,7 +226,9 @@ class PlayerAuth:
             with self.store.connect() as db:current=db.execute('SELECT hash FROM player_accounts WHERE email=?',(email,)).fetchone()
             if not account or not valid or not current or current['hash']!=account['hash']:
                 await w.respond(writer,401,{'error':'E-Mail-Adresse oder Passwort ungültig.'});return
-            encoded=None
+            actor='player:'+email;self.store.log(actor,'player-login')
+            token=self.store.new_session(actor)
+            await w.respond(writer,200,{'stage':'authenticated'},cookie=(self.COOKIE,token,28800));return
         self.hit('send-ip:'+hashlib.sha256(ip.encode()).hexdigest(),5,900)
         token=await self.challenge(email,encoded)
         await w.respond(writer,200,{'stage':'email'},cookie=(self.PENDING,token,300))

@@ -1,6 +1,6 @@
 # Anmeldung mit Authenticator-App
 
-Die Verwaltung erfordert jetzt immer zwei Faktoren: E-Mail/Passwort und einen Code aus einer Authenticator-App. Teilnehmer können ohne Konto per Sitzungscode beitreten. Spielerkonten verwenden E-Mail-Codes.
+Die Verwaltung erfordert jetzt immer zwei Faktoren: E-Mail/Passwort und einen Code aus einer Authenticator-App. Teilnehmer können ohne Konto per Sitzungscode beitreten. Spielerkonten bestätigen ihre E-Mail einmal bei der Registrierung; beim Passwortreset wird ebenfalls ein E-Mail-Code benötigt.
 
 ## Erstmalig einrichten
 
