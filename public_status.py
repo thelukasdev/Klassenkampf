@@ -224,6 +224,7 @@ def make_handler(store,static_dir):
                     body=b'ok';ctype='text/plain'
                 else:
                     files={'/status':'status.html','/status/':'status.html','/status/status.css':'status.css',
+                           '/status/cookie-notice.js':'cookie-notice.js','/status/cookie-notice.css':'cookie-notice.css',
                            '/status/status.js':'status.js','/status/lp-logo.png':'lp-logo.png'}
                     if route.path not in files:self.reply(404,b'Not found','text/plain');return
                     name=files[route.path];body=(static_dir/name).read_bytes()
