@@ -21,6 +21,8 @@ class PlayerAuth:
 
     def __init__(self,web):
         self.web=web;self.store=web.store;self.slots=asyncio.Semaphore(2);self.mail_slots=asyncio.Semaphore(2)
+        from player_permissions import PlayerPermissions
+        self.permissions=PlayerPermissions(self.store)
         with self.store.connect() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS player_accounts(email TEXT PRIMARY KEY,hash TEXT NOT NULL,created INTEGER NOT NULL);
@@ -37,7 +39,7 @@ class PlayerAuth:
     def session(self,headers):
         row=self.store.session(self.web.cookie(headers,self.COOKIE))
         if row and row['role']=='host' and row['email'].startswith('player:'):
-            row['display_email']=row['email'][7:];return row
+            row['display_email']=row['email'][7:];row['permissions']=self.permissions.get(row['email']);return row
         return None
 
     def hit(self,key,limit,window):

@@ -38,17 +38,18 @@ class HostSessions:
             rows=db.execute('SELECT h.* FROM host_rooms h JOIN game_rooms r ON h.room_id=r.id WHERE r.active=1 ORDER BY h.created DESC').fetchall()
         # Existing accounts may have started two rooms before this change.
         rows=sorted(rows,key=lambda r:bool(self.hub.rooms.get(r['room_id']) and self.online(self.hub.rooms[r['room_id']])),reverse=True)
-        seen=set()
+        seen={}
         for row in rows:
             rid=row['room_id'];reason=None
             if rid not in self.hub.rooms or not self.hub.rooms[rid].room_active:continue
-            if row['email'] in seen:reason='Sitzungslimit'
-            seen.add(row['email'])
+            policy=self.hub.server.web_admin.player_auth.permissions.get(row['email'])
+            seen[row['email']]=seen.get(row['email'],0)+1
+            if seen[row['email']]>policy['max_sessions']:reason='Sitzungslimit'
             self.observe(rid,now)
             with self.store.connect() as db:state=db.execute('SELECT * FROM host_rooms WHERE room_id=?',(rid,)).fetchone()
             if state is None:continue
-            if not state['joined'] and now-state['created']>=300:reason=reason or 'Kein Beitritt innerhalb von 5 Minuten'
-            if state['joined'] and state['empty_since'] is not None and now-state['empty_since']>=60:reason=reason or 'Seit 1 Minute leer'
+            if not policy['keep_empty'] and not state['joined'] and now-state['created']>=300:reason=reason or 'Kein Beitritt innerhalb von 5 Minuten'
+            if not policy['keep_empty'] and state['joined'] and state['empty_since'] is not None and now-state['empty_since']>=60:reason=reason or 'Seit 1 Minute leer'
             if reason:
                 await self.hub.end(rid)
                 self.store.log(row['email'],'auto-end-session',rid+' '+reason)
@@ -58,6 +59,7 @@ class HostSessions:
             row=db.execute('SELECT r.id,r.name,r.code,h.* FROM host_rooms h JOIN game_rooms r ON r.id=h.room_id WHERE h.email=? AND r.active=1 ORDER BY r.created DESC LIMIT 1',(email,)).fetchone()
         if not row:return {'session':None}
         room=self.hub.rooms.get(row['id']);online=self.online(room) if room else 0
-        deadline=None if online else row['created']+300 if not row['joined'] else (row['empty_since'] or int(time.time()))+60
+        policy=self.hub.server.web_admin.player_auth.permissions.get(email)
+        deadline=None if online or policy['keep_empty'] else row['created']+300 if not row['joined'] else (row['empty_since'] or int(time.time()))+60
         return {'session':{'id':row['id'],'name':row['name'],'code':row['code'],'online':online,
                            'matches':len(room.matches) if room else 0,'closes_at':deadline}}

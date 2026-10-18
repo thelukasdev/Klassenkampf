@@ -58,3 +58,18 @@ class HostIdleTests(unittest.IsolatedAsyncioTestCase):
   with self.app.web_admin.store.connect() as db:row=db.execute('SELECT * FROM host_rooms WHERE room_id=?',(self.a['id'],)).fetchone()
   self.assertIsNotNone(row['empty_since'])
   await self.hub.hosts.sweep(row['empty_since']+60);self.assertFalse(self.room.room_active)
+
+ async def test_granted_limits_keep_empty_and_revocation_survive_reload(self):
+  from player_permissions import DEFAULTS,PlayerPermissions
+  auth=self.app.web_admin.player_auth
+  with auth.store.connect() as db:db.execute("INSERT INTO player_accounts VALUES('test@example.org','test-hash',0)")
+  actor={'email':'owner@example.org','role':'owner'}
+  auth.permissions.set(actor,'test@example.org',{**DEFAULTS,'max_sessions':2,'keep_empty':True})
+  other=self.hub.create('Allowed second');self.hub.hosts.attach(other['id'],'player:test@example.org')
+  await self.hub.hosts.sweep(self.started+1000)
+  self.assertTrue(self.room.room_active);self.assertTrue(self.hub.get(other['id']).room_active)
+  self.assertIsNone(self.hub.hosts.overview('player:test@example.org')['session']['closes_at'])
+  self.assertEqual(PlayerPermissions(auth.store).get('test@example.org')['max_sessions'],2)
+  auth.permissions.set(actor,'test@example.org',DEFAULTS)
+  await self.hub.hosts.sweep(self.started+1001)
+  self.assertFalse(self.room.room_active);self.assertFalse(self.hub.get(other['id']).room_active)

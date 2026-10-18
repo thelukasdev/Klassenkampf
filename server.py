@@ -658,6 +658,8 @@ class Server:
         if path == '/internal/status.json':
             await self._http_response(writer,404,b'Not found')
             return
+        if path in ('/account/manage','/account/manage/'):
+            path='/admin.html'
         if path in ('/account','/account/'):
             path='/host.html'
         if path in ('/login','/login/'):

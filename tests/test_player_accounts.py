@@ -150,7 +150,7 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b'200',r);self.assertIsNone(self.auth.store.session(token));self.assertIsNotNone(self.auth.store.session(owner_token))
         self.assertFalse(self.hub.get(room['id']).room_active);self.assertTrue(self.hub.get(unrelated['id']).room_active)
         with self.auth.store.connect() as db:
-            for table in ('player_accounts','player_codes','player_resets','host_rooms','session_access'):
+            for table in ('player_accounts','player_codes','player_resets','player_permissions','host_rooms','session_access'):
                 self.assertEqual(db.execute('SELECT count(*) FROM '+table).fetchone()[0],0)
             self.assertEqual(db.execute("SELECT count(*) FROM admins WHERE email='owner@example.org' AND role='owner'").fetchone()[0],1)
             self.assertEqual(db.execute("SELECT count(*) FROM audit WHERE action='delete-player-account'").fetchone()[0],1)
@@ -197,3 +197,67 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         finally:
             release.set()
             if task and not task.done():await task
+
+    async def grant(self,**rights):
+        from player_permissions import DEFAULTS
+        owner,_=self.admin_headers()
+        r=await self.http('/api/admin/action',method='POST',extra_headers=owner,data={'action':'player-permissions','value':'owner@example.org','permissions':{**DEFAULTS,**rights}})
+        self.assertIn(b'200',r)
+
+    async def test_delegated_rights_allow_only_own_rooms_and_custom_session_limit(self):
+        h,*_=await self.signup();private=self.hub.create('Private admin room')
+        await self.grant(max_sessions=2,moderate_players=True,manage_games=True,manage_saves=True,view_results=True)
+        ids=[]
+        for name in ('One','Two'):
+            r=await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'create-session','value':name,'mode':'random'})
+            self.assertIn(b'200',r);ids.append(self.body(r)['result']['id'])
+        self.assertEqual(self.hub.get(ids[0]).mode,'random')
+        self.assertIn(b'400',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'create-session','value':'Third'}))
+        p=self.hub.get(ids[0])._add_player('Participant')
+        for data in ({'action':'ban','value':p.nick.lower()},{'action':'unban','value':p.nick.lower()},{'action':'rules','rules':{'speed':2}},{'action':'save','value':'owned-save'}):
+            self.assertIn(b'200',await self.http('/api/player/action',method='POST',extra_headers=h,data={**data,'session':ids[0]}))
+        overview=self.body(await self.http('/api/player/overview?manage=1&session='+ids[0],extra_headers=h))
+        self.assertEqual({r['id'] for r in overview['sessions']},set(ids));self.assertNotIn(private['id'],json.dumps(overview))
+        for action in ('player-permissions','add-admin','remove-admin','role','assign-session','delete-player-account'):
+            self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':action,'value':'owner@example.org'}))
+        self.assertNotIn('memory',overview['server']);self.assertEqual(overview['admins'],[]);self.assertEqual(overview['audit'],[])
+        self.assertIn(b'403',await self.http('/api/player/overview?manage=1&session='+private['id'],extra_headers=h))
+        for action in ('rules','ban','save','end-session'):
+            self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':action,'session':private['id'],'value':'Participant'}))
+        self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'move-player','session':ids[0],'target':private['id'],'value':p.nick.lower()}))
+
+    async def test_player_permission_grants_are_strict_and_revocation_is_immediate(self):
+        from player_permissions import DEFAULTS
+        h,*_=await self.signup();owner,_=self.admin_headers();guide,_=self.admin_headers('guide')
+        data={'action':'player-permissions','value':'owner@example.org','permissions':{**DEFAULTS,'manage_games':True}}
+        self.assertIn(b'403',await self.http('/api/admin/action',method='POST',extra_headers=guide,data=data))
+        self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data=data))
+        for policy in ({**DEFAULTS,'role':'admin'},{**DEFAULTS,'max_sessions':True},{**DEFAULTS,'max_sessions':17},{**DEFAULTS,'keep_empty':1},{}):
+            self.assertIn(b'400',await self.http('/api/admin/action',method='POST',extra_headers=owner,data={**data,'permissions':policy}))
+        await self.grant(manage_games=True)
+        r=await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'create-session','value':'Own'})
+        rid=self.body(r)['result']['id']
+        self.assertIn(b'200',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'rules','session':rid,'rules':{'speed':2}}))
+        self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'save','session':rid,'value':'not-allowed'}))
+        self.assertIn(b'403',await self.http('/api/player/accounts',extra_headers=h))
+        await self.grant()
+        self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'rules','session':rid,'rules':{'speed':1}}))
+        self.assertIn(b'403',await self.http('/api/player/overview?manage=1',extra_headers=h))
+        self.assertFalse(self.body(await self.http('/api/player/me',extra_headers=h))['user']['permissions']['manage_games'])
+
+    async def test_replay_permission_is_independent_and_foreign_recordings_stay_private(self):
+        h,*_=await self.signup();private=self.hub.create('Secret')
+        r=await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'create-session','value':'Own'})
+        rid=self.body(r)['result']['id'];self.hub.get(rid)._add_player('Hidden without profile rights')
+        await self.grant(view_replays=True)
+        def metadata(room,record=None):return {'id':'test-record'} if record else [{'id':'test-record'}]
+        with patch.object(self.app.replays,'metadata',side_effect=metadata):
+            overview=self.body(await self.http('/api/player/overview?manage=1&session='+rid,extra_headers=h))
+            self.assertEqual(overview['status']['players'],[]);self.assertEqual(overview['history'],[]);self.assertEqual(overview['saves'],[])
+            self.assertEqual(overview['replays'],[{'id':'test-record'}])
+            self.assertIn(b'200',await self.http('/api/player/replay?session='+rid+'&id=test-record',extra_headers=h))
+            self.assertIn(b'403',await self.http('/api/player/replay?session='+private['id']+'&id=test-record',extra_headers=h))
+        await self.grant(view_results=True)
+        self.assertIn(b'403',await self.http('/api/player/replay?session='+rid+'&id=test-record',extra_headers=h))
+        overview=self.body(await self.http('/api/player/overview?manage=1&session='+rid,extra_headers=h))
+        self.assertEqual(len(overview['status']['players']),1);self.assertEqual(overview['replays'],[])

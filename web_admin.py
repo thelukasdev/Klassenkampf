@@ -176,6 +176,7 @@ class WebAdmin:
                 (SELECT count(*) FROM sessions s WHERE s.email='player:'||p.email AND s.expires>?) AS logins
                 FROM player_accounts p WHERE instr(p.email,?)>0 AND p.email>? ORDER BY p.email LIMIT 26""",
                 (int(time.time()),search,after))]
+        for row in rows[:25]:row['permissions']=self.player_auth.permissions.get(row['email'])
         return {'accounts':rows[:25],'next':rows[24]['email'] if len(rows)>25 else None}
 
     async def manage_player(self,actor,action,value):
@@ -192,6 +193,7 @@ class WebAdmin:
                     # Persist closure before waiting for connections/workers to stop.
                     for rid in rooms:db.execute('UPDATE game_rooms SET active=0,ended=? WHERE id=?',(int(time.time()),rid))
                     db.execute('DELETE FROM host_rooms WHERE email=?',(identity,))
+                db.execute('DELETE FROM player_permissions WHERE email=?',(email,))
                 db.execute('DELETE FROM player_accounts WHERE email=?',(email,))
                 db.execute("DELETE FROM admins WHERE email=? AND role='host'",(identity,))
                 db.execute('DELETE FROM session_access WHERE email=?',(identity,))
@@ -227,10 +229,20 @@ class WebAdmin:
                 await self.respond(writer, 401, {'error':'Bitte mit E-Mail-Adresse und Passwort anmelden.'})
                 return
             if player_scope and session['role']=='host':
+                policy=session['permissions']
+                from player_permissions import extended
+                advanced=extended(policy)
                 if method=='GET' and route=='/api/admin/overview':
                     await self.server.session_hub.hosts.sweep()
-                    await self.respond(writer,200,self.server.session_hub.hosts.overview(session['email']));return
-                if not (method=='POST' and route=='/api/admin/action'):
+                    query=parse_qs(urlsplit(path).query)
+                    if query.get('manage',[''])[0]!='1':
+                        await self.respond(writer,200,self.server.session_hub.hosts.overview(session['email']));return
+                    if not advanced:raise Denied('Keine erweiterten Spielerrechte freigegeben.')
+                elif method=='GET' and route in ('/api/admin/replay','/api/admin/replay-chunk'):
+                    if not policy['view_replays']:raise Denied('Replays sind nicht freigegeben.')
+                elif method=='GET' and route=='/api/admin/join':
+                    if not advanced:raise Denied('Für Spielerkonten nicht verfügbar.')
+                elif not (method=='POST' and route=='/api/admin/action'):
                     raise Denied('Für Spielerkonten nicht verfügbar.')
             if route=='/api/admin/accounts' and method=='GET':
                 if session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Spielerkonten verwalten.')
@@ -272,6 +284,16 @@ class WebAdmin:
                 else:
                     overview={'status':await self.server.admin_action({'action':'status'}),
                               'code':self.server.login_code,'saves':self.server.admin_list_saves()}
+                if session['role']=='host':
+                    policy=self.player_auth.permissions.get(session['email'])
+                    overview['permissions']=policy
+                    if not policy['moderate_players'] and not policy['view_results']:overview['status']['players']=[]
+                    if not policy['manage_saves']:overview['saves']=[]
+                    if not policy['view_results']:overview['history']=[]
+                    if not policy['view_replays']:overview['replays']=[]
+                    if not policy['manage_games']:
+                        overview['matches_detail']=[];overview['rules']={};overview['server']={}
+                    audit=[]
                 await self.respond(writer, 200, {**overview,
                                                'admins':self.store.admins() if session['role']=='owner' else [], 'audit':audit})
                 return
@@ -295,8 +317,11 @@ class WebAdmin:
             if not isinstance(obj, dict):
                 raise ValueError('Ungueltige Anfrage')
             action, value = obj.get('action'), str(obj.get('value',''))
-            if session['role']=='host' and action not in ('create-session','end-session'):raise Denied('Für Spielerkonten nicht verfügbar.')
-            if action in ('delete-player-account','revoke-player-logins'):
+            if session['role']=='host' and not self.player_auth.permissions.permits(self.player_auth.permissions.get(session['email']),action):raise Denied('Diese Aktion ist nicht freigegeben.')
+            if action=='player-permissions':
+                self.player_auth.permissions.set(session,value,obj.get('permissions'))
+                result='Spielerrechte gespeichert.'
+            elif action in ('delete-player-account','revoke-player-logins'):
                 result=await self.manage_player(session,action,value)
             elif action=='role':
                 self.store.set_role(session,value,obj.get('role'))
@@ -342,13 +367,15 @@ class WebAdmin:
                             if not self.player_auth.session(headers):raise Denied('Bitte erneut anmelden.')
                             with self.store.connect() as db:
                                 count=db.execute('SELECT count(*) FROM session_access a JOIN game_rooms r ON a.room_id=r.id WHERE a.email=? AND r.active=1',(session['email'],)).fetchone()[0]
-                            if count>=1:raise ValueError('Du kannst nur eine Sitzung gleichzeitig starten.')
-                            self.player_auth.hit('create:'+session['email'],5,86400)
-                            obj={**obj,'mode':'choose'}
+                            policy=self.player_auth.permissions.get(session['email'])
+                            if count>=policy['max_sessions']:raise ValueError('Dein Sitzungslimit ist erreicht.')
+                            self.player_auth.hit('create:'+session['email'],max(5,policy['max_sessions']),86400)
+                            if not policy['manage_games']:obj={**obj,'mode':'choose'}
                         elif session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren duerfen Sitzungen erstellen.')
                     else:self.store.check_room(session,str(obj.get('session','')))
                     if action=='move-player':self.store.check_room(session,str(obj.get('target','')))
                 result = await self.server.admin_action(obj)
+                if action=='save' and session['role']=='host':result='Sicherung gespeichert.'
                 if action=='create-session' and session['role']=='host':
                     with self.store.connect() as db:db.execute('INSERT INTO session_access VALUES(?,?)',(session['email'],result['id']))
                     self.server.session_hub.hosts.attach(result['id'],session['email'])

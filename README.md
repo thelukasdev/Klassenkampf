@@ -9,6 +9,7 @@ Browser-Minispiele mit parallelen Spielsitzungen, Webverwaltung und öffentliche
 - Spielerkonten mit E-Mail-Bestätigung, Passwort und E-Mail-Code bei jeder Anmeldung; Passwortreset per E-Mail.
 - Ein aktiver Spielraum je Spielerkonto, automatische Schließung nach fünf Minuten ohne ersten Beitritt oder einer Minute nach dem letzten Spieler.
 - Verwaltung mit Authenticator-2FA, Rollen, Kontenverwaltung, Spielsteuerung, Ergebnissen und Sicherungen.
+- Pro Spielerkonto schaltbare Zusatzrechte, eigene erweiterte Verwaltung und einstellbare Sitzungslimits.
 - Zuschauerfreigaben und Replays für die Spielleitung.
 - Separate Statusüberwachung mit dauerhaftem Verlauf und Anzeige der letzten sechs Ereignisse.
 - Unterprozess je spielender Sitzung, getrennte Spielzustände je Partie.
@@ -70,7 +71,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 64 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 68 Tests geprüft.
 
 ## Anleitungen
 
