@@ -11,6 +11,7 @@ Browser-Minispiele mit parallelen Spielsitzungen, Webverwaltung und öffentliche
 - Verwaltung mit Authenticator-2FA, Rollen, Kontenverwaltung, Spielsteuerung, Ergebnissen und Sicherungen.
 - Pro Spielerkonto schaltbare Zusatzrechte, eigene erweiterte Verwaltung und einstellbare Sitzungslimits.
 - Zuschauerfreigaben und Replays für die Spielleitung.
+- Einladungslinks und QR-Codes, Passwortänderung im Konto und manuelle Fehlermeldungen mit Referenznummer und Verwaltungsansicht.
 - Separate Statusüberwachung mit dauerhaftem Verlauf und Anzeige der letzten sechs Ereignisse.
 - Unterprozess je spielender Sitzung, getrennte Spielzustände je Partie.
 
@@ -71,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 68 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 72 Tests geprüft.
 
 ## Anleitungen
 

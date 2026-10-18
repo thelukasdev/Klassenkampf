@@ -33,3 +33,5 @@ input:not([type=radio]):not([type=checkbox]),select,.session-toolbar select{back
 .accounts-list{margin:20px 0}.accounts-list .list-row{flex-wrap:wrap;gap:14px}.accounts-list strong{overflow-wrap:anywhere}.accounts-list .list-row>div:first-child{min-width:0;flex:1 1 240px}#accountSearch{width:100%;margin-top:8px}#accountsError{color:#ff9999;margin-top:12px}
 
 #playerRightsDialog{width:min(520px,calc(100% - 32px))}#playerRightsEmail{overflow-wrap:anywhere}.player-right-options{display:grid;gap:14px;margin:12px 0}.player-right-options label{display:flex;align-items:center;gap:10px}.player-right-options input{width:18px;height:18px;flex:0 0 auto}
+
+.issue-report{border-top:1px solid #344149;padding:20px 0}.issue-report p{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px}.issue-report>a{display:block;margin-top:8px}.report-filters{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0}.report-filters label{flex:1 1 150px}.report-filters input,.report-filters select{display:block;width:100%;margin-top:8px}#reportsError{color:#ff9999}.report-link{font-size:11px;margin-left:14px}

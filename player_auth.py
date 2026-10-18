@@ -137,10 +137,47 @@ class PlayerAuth:
             db.execute('DELETE FROM sessions WHERE email=?',('player:'+row['email'],))
         self.store.log('player:'+row['email'],'player-password-reset')
 
+    async def change_password(self,headers,obj):
+        session=self.session(headers);w=self.web
+        if not session:raise Denied('Bitte erneut anmelden.')
+        if headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Ungültige Sicherheitsprüfung.')
+        old=obj.get('current_password','');new=obj.get('password','')
+        if not isinstance(old,str) or not 1<=len(old)<=256 or not isinstance(new,str) or not 12<=len(new)<=256:raise ValueError('Passwort muss 12 bis 256 Zeichen lang sein.')
+        if old==new:raise ValueError('Bitte ein anderes neues Passwort wählen.')
+        self.hit('change-password:'+session['email'],5,900)
+        email=session['display_email'];key=self.store.digest(w.cookie(headers,self.COOKIE))
+        with self.store.connect() as db:account=db.execute('SELECT hash FROM player_accounts WHERE email=?',(email,)).fetchone()
+        if not account:raise Denied('Bitte erneut anmelden.')
+        if self.slots.locked():raise ValueError('Bitte später erneut versuchen.')
+        async with self.slots:
+            valid=await asyncio.to_thread(PasswordAuth.verify,old,account['hash'])
+            if not valid:raise ValueError('Aktuelles Passwort ist falsch.')
+            encoded=await asyncio.to_thread(PasswordAuth.encode,new)
+        with self.store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current=db.execute('SELECT hash FROM player_accounts WHERE email=?',(email,)).fetchone()
+            active=db.execute('SELECT 1 FROM sessions WHERE token=? AND email=? AND expires>?',(key,session['email'],int(time.time()))).fetchone()
+            if not active or not current or current['hash']!=account['hash']:raise Denied('Bitte erneut anmelden.')
+            db.execute('UPDATE player_accounts SET hash=? WHERE email=?',(encoded,email))
+            db.execute('DELETE FROM sessions WHERE email=?',(session['email'],))
+            db.execute('DELETE FROM player_codes WHERE email=?',(email,))
+            db.execute('DELETE FROM player_resets WHERE email=?',(email,))
+        self.store.log(session['email'],'player-password-change')
+
     async def handle(self,reader,writer,method,route,headers):
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
             token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':self.ready},cookie=(self.CSRF,token,600));return
+        if route=='/auth/player/change-password' and method=='POST':
+            session=self.session(headers)
+            if not session or headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Bitte erneut anmelden.')
+            if headers.get('transfer-encoding') or headers.get('content-type','').split(';')[0]!='application/json':raise ValueError('JSON erforderlich.')
+            length=int(headers.get('content-length','0'))
+            if not 0<length<=4096:raise ValueError('Anfrage zu groß.')
+            obj=json.loads(await asyncio.wait_for(reader.readexactly(length),5))
+            if not isinstance(obj,dict):raise ValueError('Ungültige Anfrage.')
+            await self.change_password(headers,obj)
+            await w.respond(writer,200,{'ok':True},cookie=(self.COOKIE,'',0));return
         if route=='/auth/player/logout' and method=='POST':
             session=self.session(headers)
             if not session or headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Ungültige Sicherheitsprüfung.')

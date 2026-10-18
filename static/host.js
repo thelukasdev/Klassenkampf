@@ -8,6 +8,9 @@
   $('hostCreate').onsubmit=e=>{e.preventDefault();action('create-session');};
   $('hostEnd').onclick=()=>{if(confirm('Sitzung für alle Spieler beenden?'))action('end-session');};
   $('hostCopy').onclick=async()=>{if(!current)return;try{await navigator.clipboard.writeText(current.code);notice('Code kopiert.');}catch{notice('Code bitte manuell markieren und kopieren.');}};
+  $('hostInvite').onclick=async()=>{if(!current)return;try{const d=await api('join?session='+encodeURIComponent(current.id));$('hostInviteUrl').value=d.url;$('hostInviteQr').src=d.qr;$('hostInviteDialog').showModal();}catch(error){notice(error.message);}};
+  $('hostInviteCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('hostInviteUrl').value);$('hostInviteCopy').textContent='Link kopiert';}catch{$('hostInviteUrl').focus();$('hostInviteUrl').select();$('hostInviteCopy').textContent='Link bitte manuell kopieren';}};
+  $('hostInviteClose').onclick=()=>{$('hostInviteDialog').close();$('hostInviteCopy').textContent='Link kopieren';};
   $('hostLogout').onclick=async()=>{if(!user)return;try{const r=await fetch('/auth/player/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':user.csrf},body:'{}'});if(r.ok)location.replace('/');else notice('Abmelden fehlgeschlagen.');}catch{notice('Verbindung unterbrochen.');}};
   api('me').then(data=>{user=data.user;if(!user){location.replace('/login');return;}refresh();}).catch(e=>notice(e.message));
   setInterval(()=>{if(user&&!busy&&!document.hidden)refresh();},10000);setInterval(expiry,1000);

@@ -142,6 +142,8 @@ class WebAdmin:
         self.password_auth = PasswordAuth(self)
         from player_auth import PlayerAuth
         self.player_auth=PlayerAuth(self)
+        from reports import Reports
+        self.reports=Reports(self)
         os.chmod(self.store.path,0o600)
 
     @staticmethod
@@ -211,6 +213,8 @@ class WebAdmin:
         player_scope=route.startswith('/api/player/')
         if player_scope:route=route.replace('/api/player/','/api/admin/',1)
         try:
+            if route.startswith('/auth/report/'):
+                await self.reports.handle(reader,writer,method,route,headers);return
             if route.startswith('/auth/player/'):
                 await self.player_auth.handle(reader,writer,method,route,headers);return
             if route.startswith('/auth/google/'):
@@ -241,9 +245,11 @@ class WebAdmin:
                 elif method=='GET' and route in ('/api/admin/replay','/api/admin/replay-chunk'):
                     if not policy['view_replays']:raise Denied('Replays sind nicht freigegeben.')
                 elif method=='GET' and route=='/api/admin/join':
-                    if not advanced:raise Denied('Für Spielerkonten nicht verfügbar.')
+                    pass
                 elif not (method=='POST' and route=='/api/admin/action'):
                     raise Denied('Für Spielerkonten nicht verfügbar.')
+            if route=='/api/admin/reports' and method=='GET':
+                await self.respond(writer,200,self.reports.list(session,parse_qs(urlsplit(path).query)));return
             if route=='/api/admin/accounts' and method=='GET':
                 if session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Spielerkonten verwalten.')
                 await self.respond(writer,200,self.player_accounts(parse_qs(urlsplit(path).query)));return
@@ -318,7 +324,10 @@ class WebAdmin:
                 raise ValueError('Ungueltige Anfrage')
             action, value = obj.get('action'), str(obj.get('value',''))
             if session['role']=='host' and not self.player_auth.permissions.permits(self.player_auth.permissions.get(session['email']),action):raise Denied('Diese Aktion ist nicht freigegeben.')
-            if action=='player-permissions':
+            if action=='resolve-report':
+                self.reports.resolve(session,value,obj.get('resolved'))
+                result='Meldung aktualisiert.'
+            elif action=='player-permissions':
                 self.player_auth.permissions.set(session,value,obj.get('permissions'))
                 result='Spielerrechte gespeichert.'
             elif action in ('delete-player-account','revoke-player-logins'):
@@ -389,7 +398,7 @@ class WebAdmin:
             else:
                 await self.respond(writer, 403, {'error':str(exc)})
         except ValueError as exc:
-            message=str(exc) if route.startswith('/auth/player/') or player_scope else 'Die Anfrage konnte nicht verarbeitet werden.'
+            message=str(exc) if route.startswith(('/auth/player/','/auth/report/')) or player_scope else 'Die Anfrage konnte nicht verarbeitet werden.'
             await self.respond(writer,400,{'error':message or 'Ungültige Anfrage.'})
         except (TypeError, KeyError, TimeoutError, asyncio.IncompleteReadError):
             await self.respond(writer, 400, {'error':'Die Anfrage konnte nicht verarbeitet werden.'})

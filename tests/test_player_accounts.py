@@ -51,8 +51,10 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         overview=self.body(await self.http('/api/player/overview',extra_headers=h));self.assertEqual(overview['session']['id'],rid)
         self.assertEqual(set(overview),{'session'})
         self.assertNotIn('ADMIN PRIVATE',json.dumps(overview))
-        for path in ('/api/player/replay','/api/player/replay-chunk','/api/player/join'):
+        for path in ('/api/player/replay','/api/player/replay-chunk'):
             self.assertIn(b'403',await self.http(path+'?session='+rid,extra_headers=h))
+        self.assertIn(b'200',await self.http('/api/player/join?session='+rid,extra_headers=h))
+        self.assertIn(b'403',await self.http('/api/player/join?session='+private['id'],extra_headers=h))
         for action in ('rules','ban','kick','save','load','mode','spectators','reset-credits','remove-player','move-player'):
             self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':action,'session':rid}))
         self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'end-session','session':private['id']}))
@@ -261,3 +263,64 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b'403',await self.http('/api/player/replay?session='+rid+'&id=test-record',extra_headers=h))
         overview=self.body(await self.http('/api/player/overview?manage=1&session='+rid,extra_headers=h))
         self.assertEqual(len(overview['status']['players']),1);self.assertEqual(overview['replays'],[])
+
+    async def test_account_password_change_requires_current_password_and_revokes_all_player_auth(self):
+        from password_auth import PasswordAuth
+        h,token,*_=await self.signup();admin,admin_token=self.admin_headers()
+        second=self.auth.store.new_session('player:owner@example.org')
+        await self.auth.challenge('owner@example.org')
+        with patch.object(self.auth,'send_reset'):await self.auth.request_reset('owner@example.org')
+        data={'current_password':'test-player-password-123','password':'replacement-account-password-456'}
+        self.assertIn(b'403',await self.http('/auth/player/change-password',method='POST',data=data))
+        self.assertIn(b'403',await self.http('/auth/player/change-password',method='POST',extra_headers={**h,'Origin':'https://evil.test'},data=data))
+        self.assertIn(b'400',await self.http('/auth/player/change-password',method='POST',extra_headers=h,data={**data,'current_password':'wrong'}))
+        self.assertIsNotNone(self.auth.store.session(token))
+        self.assertIn(b'400',await self.http('/auth/player/change-password',method='POST',extra_headers=h,data={**data,'password':'short'}))
+        with patch.dict(os.environ,{'SMTP_PASSWORD':''}):
+            r=await self.http('/auth/player/change-password',method='POST',extra_headers=h,data=data)
+        self.assertIn(b'200',r);self.assertEqual(self.cookie(r,self.auth.COOKIE),'')
+        self.assertIsNone(self.auth.store.session(token));self.assertIsNone(self.auth.store.session(second));self.assertIsNotNone(self.auth.store.session(admin_token))
+        with self.auth.store.connect() as db:
+            encoded=db.execute('SELECT hash FROM player_accounts').fetchone()[0]
+            self.assertTrue(PasswordAuth.verify(data['password'],encoded));self.assertFalse(PasswordAuth.verify(data['current_password'],encoded))
+            self.assertEqual(db.execute('SELECT count(*) FROM player_codes').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM player_resets').fetchone()[0],0)
+
+    async def test_manual_reports_private_access_resolution_and_input_protection(self):
+        r=await self.http('/auth/report/csrf');csrf=self.body(r)['csrf'];report=self.app.web_admin.reports
+        headers={'Origin':'https://games.example.org','Content-Type':'application/json','X-CSRF-Token':csrf,'Cookie':report.COOKIE+'='+self.cookie(r,report.COOKIE),'X-Forwarded-For':'192.0.2.5'}
+        data={'page':'/','description':'Die Spielrunde bleibt beim Start hängen.'}
+        self.assertIn(b'403',await self.http('/auth/report/submit',method='POST',extra_headers={**headers,'Origin':'https://evil.test'},data=data))
+        self.assertIn(b'400',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data={**data,'page':'/?code=PRIVATE'}))
+        r=await self.http('/auth/report/submit',method='POST',extra_headers=headers,data=data)
+        self.assertIn(b'200',r);reference=self.body(r)['reference'];self.assertRegex(reference,r'^KK-[A-F0-9]{12}$')
+        owner,_=self.admin_headers();guide,_=self.admin_headers('guide');player,*_=await self.signup()
+        self.assertIn(b'401',await self.http('/api/admin/reports'))
+        self.assertIn(b'403',await self.http('/api/admin/reports',extra_headers=guide))
+        self.assertIn(b'403',await self.http('/api/player/reports',extra_headers=player))
+        rows=self.body(await self.http('/api/admin/reports?q='+reference,extra_headers=owner))['reports']
+        self.assertEqual(len(rows),1);self.assertEqual(rows[0]['description'],data['description'])
+        self.assertEqual(set(rows[0]),{'id','reference','created','page','description','resolved'})
+        action={'action':'resolve-report','value':reference,'resolved':True}
+        self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=player,data=action))
+        self.assertIn(b'200',await self.http('/api/admin/action',method='POST',extra_headers=owner,data=action))
+        self.assertEqual(self.body(await self.http('/api/admin/reports',extra_headers=owner))['reports'],[])
+        self.assertEqual(self.body(await self.http('/api/admin/reports?state=resolved',extra_headers=owner))['reports'][0]['reference'],reference)
+        for _ in range(4):self.assertIn(b'200',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data=data))
+        self.assertIn(b'400',await self.http('/auth/report/submit',method='POST',extra_headers=headers,data=data))
+
+    async def test_concurrent_password_changes_cannot_overwrite_new_credentials(self):
+        import asyncio
+        h,token,*_=await self.signup()
+        a,b=await asyncio.gather(*[self.http('/auth/player/change-password',method='POST',extra_headers=h,data={'current_password':'test-player-password-123','password':new}) for new in ('changed-password-one-123','changed-password-two-123')])
+        self.assertEqual(sorted([int(r.split(b' ',2)[1]) for r in (a,b)]),[200,403])
+        self.assertIsNone(self.auth.store.session(token))
+
+    async def test_report_history_pages_have_no_duplicates(self):
+        owner,_=self.admin_headers()
+        with self.auth.store.connect() as db:
+            for n in range(31):db.execute('INSERT INTO issue_reports(reference,created,page,description) VALUES(?,0,?,?)',(f'KK-TEST{n:08}', '/','Pagination fixture'))
+        first=self.body(await self.http('/api/admin/reports?state=all',extra_headers=owner))
+        second=self.body(await self.http('/api/admin/reports?state=all&before='+str(first['next']),extra_headers=owner))
+        self.assertEqual(len(first['reports']),25);self.assertEqual(len(second['reports']),6)
+        self.assertIsNone(second['next']);self.assertEqual(len({r['id'] for r in first['reports']+second['reports']}),31)

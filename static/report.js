@@ -1,0 +1,6 @@
+(() => {
+ const $=id=>document.getElementById(id);let csrf='';
+ const page=new URLSearchParams(location.search).get('page');if([...$('reportPage').options].some(o=>o.value===page))$('reportPage').value=page;
+ fetch('/auth/report/csrf',{credentials:'same-origin',cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json();}).then(d=>{csrf=d.csrf;$('reportSubmit').disabled=false;}).catch(()=>{$('reportError').textContent='Meldedienst momentan nicht erreichbar.';$('reportError').hidden=false;});
+ $('reportForm').onsubmit=async e=>{e.preventDefault();$('reportSubmit').disabled=true;$('reportError').hidden=true;try{const r=await fetch('/auth/report/submit',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({page:$('reportPage').value,description:$('reportDescription').value})});const d=await r.json();if(!r.ok)throw Error(d.error||'Meldung konnte nicht gesendet werden.');$('reportForm').hidden=true;$('reportSuccess').hidden=false;$('reportReference').textContent=d.reference;$('reportDescription').value='';}catch(error){$('reportError').textContent=error.message;$('reportError').hidden=false;}finally{$('reportSubmit').disabled=false;}};
+})();
