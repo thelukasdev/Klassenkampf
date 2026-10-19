@@ -584,6 +584,10 @@ class Server:
         m.task = asyncio.create_task(m.run())
         return m
 
+    @property
+    def room_path(self):
+        return '/raum/'+hashlib.sha256(('room-url:'+self.room_id).encode()).hexdigest() if self.room_id else '/'
+
     def close_match(self, m):
         m.spectator_token=None
         m.disconnected.clear()
@@ -725,6 +729,7 @@ class Server:
         if path == '/internal/status.json':
             await self._http_response(writer,404,b'Not found')
             return
+        if re.fullmatch(r'/raum/[0-9a-f]{64}/?',path):path='/index.html'
         if path in ('/report','/report/'):path='/report.html'
         if path in ('/account/security','/account/security/'):
             path='/security.html'
@@ -931,7 +936,7 @@ class Server:
                 return player
             conn.authed = True
             await conn.send({"t": "login_ok", "code": code, "auto": bool(obj.get("nick")),
-                             "session":self.room_id,"session_name":getattr(self,'room_name',None),"mode":self.mode})
+                             "session":self.room_id,"room_path":self.room_path,"session_name":getattr(self,'room_name',None),"mode":self.mode})
             if obj.get("nick"):                 # Wiederverbinden nach Neuladen
                 return await self._claim(conn, player, obj)
             return player

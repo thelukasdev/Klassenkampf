@@ -1,9 +1,10 @@
 /* Klassenkampf Client: WebSocket, Screens, Lobby, Eingabe, Render-Loop. */
 (function () {
   const $ = (id) => document.getElementById(id);
+  const bootStarted=performance.now();let bootFinishTimer;
   const bootTimer=setTimeout(()=>{if($('bootScreen').hidden)return;$('bootMessage').textContent='Die Verbindung dauert länger. Wir versuchen es weiter …';$('bootRetry').hidden=false;},8000);
   $('bootRetry').onclick=()=>location.reload();
-  function finishBoot(){clearTimeout(bootTimer);$('bootScreen').hidden=true;document.body.classList.remove('booting');document.body.removeAttribute('aria-busy');}
+  function finishBoot(){if($('bootScreen').hidden){tryAutoLogin();return;}clearTimeout(bootFinishTimer);bootFinishTimer=setTimeout(()=>{if(!ws||ws.readyState!==1||transportLost)return;clearTimeout(bootTimer);$('bootScreen').hidden=true;document.body.classList.remove('booting');document.body.removeAttribute('aria-busy');tryAutoLogin();},Math.max(0,2000-(performance.now()-bootStarted)));}
   const screens = ['login', 'nick', 'lobby', 'game'];
   function show(name) { screens.forEach(s => $(s).classList.toggle('active', s === name)); cur = name; }
   const canvas = $('c'), ctx = canvas.getContext('2d');
@@ -58,11 +59,12 @@
   function handle(m) {
     switch (m.t) {
       case 'pong': break;
-      case 'welcome':finishBoot();transportLost=false;connectionNotice('');gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); tryAutoLogin(); break;
+      case 'welcome':transportLost=false;connectionNotice('');gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); finishBoot(); break;
       case 'login_ok':
         me.code = m.code;
         lsSet('cw_code', m.code);
         tabCode(m.code);
+        if(/^\/raum\/[a-f0-9]{64}$/.test(m.room_path||'')){tabRoomPath(m.room_path);history.replaceState(null,'',m.room_path);}
         const profile = savedProfile(m.code);
         $('nickInput').value = profile.nick || lsGet('cw_nick') || '';
         $('sessionLabel').textContent = m.session_name || '';
@@ -79,14 +81,14 @@
         break;
       case 'session_ended':
         reconnectAllowed=true;transportLost=false;pauseState=null;connectionNotice('');
-        lsDel('cw_code'); tabCode(null); me.code = null; me.nick = null;me.tok=null;
+        lsDel('cw_code'); tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); me.code = null; me.nick = null;me.tok=null;
         $('loginErr').textContent = m.msg; show('login');
         break;
       case 'lobby': lobbyState = m; buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
       case 'challenged': toast(m.nick + ' fordert dich heraus' + (m.gname ? ': ' + m.gname : '')); break;
       case 'match_start': startMatch(m); break;
       case 'state': snap = m.s; if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;
-      case 'session_moved':lsSet('cw_profile_'+m.code,JSON.stringify({nick:me.nick,tok:lsGet('cw_tok')}));tabCode(m.code);location.reload();break;
+      case 'session_moved':lsSet('cw_profile_'+m.code,JSON.stringify({nick:me.nick,tok:lsGet('cw_tok')}));tabCode(m.code);tabRoomPath(null);history.replaceState(null,'','/');location.reload();break;
       case 'match_pause':pauseState={paused:m.paused,waiting:(m.waiting||[]).map(p=>({...p,until:performance.now()+p.seconds*1000}))};keyMask=touchMask=canvasMask=inputMask=0;break;
       case 'match_cancelled':pauseState=null;connectionNotice('');match=null;snap=null;$('overlay').classList.remove('active');show('lobby');toast(m.msg);sendMsg({t:'lobby'});break;
       case 'match_end': endMatch(m); break;
@@ -103,10 +105,12 @@
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
   function savedProfile(code) { try { return JSON.parse(lsGet('cw_profile_' + code) || '{}'); } catch { return {}; } }
   function tabCode(value) { try { if(value===null)sessionStorage.removeItem('cw_code');else if(value!==undefined)sessionStorage.setItem('cw_code',value);return sessionStorage.getItem('cw_code'); } catch { return null; } }
+  function tabRoomPath(value){try{if(value===null)sessionStorage.removeItem('cw_room_path');else if(value!==undefined)sessionStorage.setItem('cw_room_path',value);return sessionStorage.getItem('cw_room_path');}catch(_){return null;}}
   // Nach Neuladen: mit gespeichertem Code + Name + Schluessel direkt zurueck
   function tryAutoLogin() {
     const urlCode=new URLSearchParams(location.search).get('code');
     if(urlCode){$('codeInput').value=urlCode;tabCode(urlCode);history.replaceState(null,'','/');sendMsg({t:'login',code:urlCode});return;}
+    if(location.pathname.startsWith('/raum/')&&!me.code&&tabRoomPath()!==location.pathname.replace(/\/$/,''))return;
     const c = me.code||tabCode(), profile = savedProfile(c);
     const n = me.nick||profile.nick||lsGet('cw_nick'), k = me.tok||profile.tok||lsGet('cw_tok');
     if (c && n && k) sendMsg({ t: 'login', code: c, nick: n, tok: k });
@@ -126,7 +130,7 @@
     if (cur === 'game' && !confirm('Sitzung wechseln und die laufende Partie verlassen?')) return;
     if(cur==='game')sendMsg({t:'leave'});
     clearTimeout(retryTimer);reconnectAllowed=true;pauseState=null;transportLost=false;connectionNotice('');ws.onclose = null; ws.close();
-    tabCode(null); lsDel('cw_code');
+    tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); lsDel('cw_code');
     me = {code:null,nick:null,credits:0}; match = null; snap = null;
     $('codeInput').value = ''; $('loginErr').textContent = '';
     show('login'); connect();

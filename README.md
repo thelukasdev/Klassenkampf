@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 88 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 89 Tests geprüft.
 
 ## Anleitungen
 
@@ -91,3 +91,5 @@ Die öffentlichen Seiten `/impressum` und `/datenschutz` benötigen eine private
 Kontolöschung und automatische Löschfristen: siehe [DATENLOESCHUNG.md](DATENLOESCHUNG.md).
 
 Automatische Wiederverbindung mit 30 Sekunden Partiepause: siehe [WIEDERVERBINDUNG.md](WIEDERVERBINDUNG.md).
+
+Raumadressen ohne Beitrittscode und weiterhin direkte Einladungen: [RAUMADRESSEN.md](RAUMADRESSEN.md).

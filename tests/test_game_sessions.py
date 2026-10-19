@@ -141,3 +141,16 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(room.players['alice'].credits,0)
         self.assertEqual(room.players['other'].credits,0)
         self.assertEqual(room.players['other'].record,{})
+
+    async def test_opaque_room_address_is_not_a_login_credential(self):
+        r,w,token,lobby,login=await self.join(self.a['code'],'AddressTest')
+        path=login['room_path'];self.assertRegex(path,r'^/raum/[0-9a-f]{64}$')
+        self.assertEqual(path,self.hub.get(self.a['id']).room_path)
+        self.assertNotEqual(path,self.hub.get(self.b['id']).room_path)
+        response=await self.http(path)
+        self.assertIn(b'200 OK',response)
+        body=response.split(b'\r\n\r\n',1)[1].decode()
+        self.assertNotIn(self.a['code'],body);self.assertIn('src="/app.js"',body)
+        guest,gw,_=await self.websocket();await self.until(guest,'welcome')
+        await self.send(gw,{'t':'login','code':path.rsplit('/',1)[-1],'nick':'Intruder'})
+        await self.until(guest,'login_err');self.assertNotIn('intruder',self.hub.get(self.a['id']).players)
