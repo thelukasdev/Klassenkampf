@@ -52,4 +52,4 @@ class PlayerPermissions:
 
     @staticmethod
     def permits(policy, action):
-        return action in ('create-session', 'end-session') or bool(policy.get(ACTIONS.get(action, ''), False))
+        return action in ('create-session', 'end-session','release-waiting-room') or bool(policy.get(ACTIONS.get(action, ''), False))

@@ -20,7 +20,7 @@
     'reset-credits':'Credits zurückgesetzt',mode:'Spielmodus geändert',save:'Spielstand gesichert',load:'Spielstand geladen',
     'add-admin':'Zugriff freigegeben','remove-admin':'Zugriff entfernt','reset-admin-password':'Passwort geändert',
     rules:'Regeln geändert','pause-match':'Partie pausiert / fortgesetzt','spectators':'Zuschauerfreigabe geändert','end-match':'Partie ohne Wertung beendet','move-player':'Spieler zugeordnet','remove-player':'Spieler entfernt',role:'Rolle geändert','assign-session':'Sitzungszugriff geändert',
-    'create-session':'Spielsitzung gestartet','end-session':'Spielsitzung beendet'};
+    'release-waiting-room':'Warteraum freigegeben','create-session':'Spielsitzung gestartet','end-session':'Spielsitzung beendet'};
   function el(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
   function toast(text, error=false) { clearTimeout(toastTimer); $('toast').textContent=text; $('toast').className='toast'+(error?' error':''); $('toast').hidden=false; toastTimer=setTimeout(()=>$('toast').hidden=true,5500); }
   async function api(path, data) {
@@ -77,6 +77,7 @@
   async function showJoin(id,name){try{const data=await api('/api/admin/join?session='+encodeURIComponent(id));$('qrTitle').textContent=name;$('joinQr').src=data.qr;$('joinUrl').href=data.url;$('qrDialog').showModal();}catch(e){toast(e.message,true);}}
   function renderControls(){
     const sessions=snapshot.sessions||[],server=snapshot.server||{},rules=snapshot.rules||{};
+    const waiting=snapshot.flow||{};$('waitingPanel').hidden=!waiting.waiting;$('waitingSummary').textContent=(waiting.ready||0)+' / '+(waiting.online||0)+' Spieler bereit';$('waitingRelease').disabled=!waiting.can_release;
     $('globalStats').replaceChildren(...[`${sessions.filter(s=>s.active).length} aktive Sitzungen`,`${sessions.reduce((a,s)=>a+s.online,0)} Spieler online`,`${sessions.reduce((a,s)=>a+s.matches,0)} laufende Partien`].map(t=>el('span',t)));
     if(!document.querySelector('#rulesForm:focus-within')){
       const enabled=$('enabledGames');enabled.replaceChildren();(server.games||[]).forEach(g=>{const label=el('label'),check=el('input');check.type='checkbox';check.value=g.id;check.name='gameEnabled';check.checked=(rules.enabled||[]).includes(g.id);label.append(check,document.createTextNode(g.name));enabled.append(label);});
@@ -102,6 +103,7 @@
   $('exportRanking').onclick=()=>csvDownload('rangliste',[['Spieler','Credits','Siege','Niederlagen'],...[...snapshot.status.players].sort((a,b)=>b.credits-a.credits).map(p=>[p.nick,p.credits,...p.wl])]);
   $('exportHistory').onclick=()=>csvDownload('partien',[['Zeit','Spiel','Spieler','Ergebnisse','Grund','Dauer (s)'],...(snapshot.history||[]).map(m=>[new Date(m.time*1000).toISOString(),m.name,m.players.join(' / '),Object.entries(m.outcomes).map(([k,v])=>k+': '+v).join(' / '),m.reason,m.duration])]);
   $('rulesForm').onsubmit=async event=>{event.preventDefault();document.activeElement.blur();await action('rules','',null,null,{rules:{enabled:[...document.querySelectorAll('[name=gameEnabled]:checked')].map(x=>x.value),speed:Number($('ruleSpeed').value),credits_win:Number($('ruleWin').value),credits_loss:Number($('ruleLoss').value),credits_draw:Number($('ruleDraw').value)}});};
+  $('waitingRelease').onclick=()=>action('release-waiting-room','');
   $('pauseSession').onclick=()=>action('rules','',null,null,{rules:{paused:!snapshot.rules.paused}});
   $('copyInviteLink').onclick=async()=>{try{await navigator.clipboard.writeText($('joinUrl').href);toast('Einladungslink kopiert.');}catch{toast('Link bitte manuell kopieren.',true);}};
   $('showQr').onclick=()=>{if(selectedSession)showJoin(selectedSession,snapshot.session_name);};
@@ -138,7 +140,7 @@
   document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.goto)));
   $('refresh').addEventListener('click',async()=>{await refresh();if(activeTab==='accounts')await loadAccounts();if(activeTab==='reports')await loadReports();});$('playerSearch').addEventListener('input',filterPlayers);
   $('sessionSelect').addEventListener('change',()=>{selectedSession=$('sessionSelect').value;refresh();});
-  $('sessionForm').addEventListener('submit',async event=>{event.preventDefault();await action('create-session',$('sessionName').value.trim());});
+  $('sessionForm').addEventListener('submit',async event=>{event.preventDefault();await action('create-session',$('sessionName').value.trim(),null,null,{waiting_room:$('sessionWaiting').checked});});
   document.querySelectorAll('[name=mode]').forEach(b=>b.addEventListener('change',()=>action('mode',b.value)));
   $('saveForm').addEventListener('submit',async event=>{event.preventDefault();const value=$('saveName').value.trim();await action('save',value,snapshot.saves.includes(value)?['Sicherung überschreiben?',`„${value}“ wird durch den aktuellen Stand ersetzt.`]:null);});
   $('accessForm').addEventListener('submit',async event=>{event.preventDefault();const saved=await action(accessMode,$('adminEmail').value.trim(),null,null,{password:$('adminPassword').value,role:$('adminRole').value});if(!saved)return;$('adminPassword').value='';accessMode='add-admin';document.querySelector('#accessForm button[type=submit]').textContent='Person freischalten';});

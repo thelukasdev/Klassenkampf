@@ -37,3 +37,5 @@ input:not([type=radio]):not([type=checkbox]),select,.session-toolbar select{back
 .issue-report{border-top:1px solid #344149;padding:20px 0}.issue-report p{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px}.issue-report>a{display:block;margin-top:8px}.report-filters{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0}.report-filters label{flex:1 1 150px}.report-filters input,.report-filters select{display:block;width:100%;margin-top:8px}#reportsError{color:#ff9999}.report-link{font-size:11px;margin-left:14px}
 
 footer .legal-link{font-size:11px;color:#a9c8c0;text-decoration:none;margin-left:12px;white-space:nowrap}footer{flex-wrap:wrap}
+
+.waiting-check{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.6}.waiting-check input[type=checkbox]{width:18px;height:18px;padding:0;flex-shrink:0;accent-color:#73d363}

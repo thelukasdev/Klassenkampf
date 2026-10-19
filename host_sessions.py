@@ -62,4 +62,4 @@ class HostSessions:
         policy=self.hub.server.web_admin.player_auth.permissions.get(email)
         deadline=None if online or policy['keep_empty'] else row['created']+300 if not row['joined'] else (row['empty_since'] or int(time.time()))+60
         return {'session':{'id':row['id'],'name':row['name'],'code':row['code'],'online':online,
-                           'matches':len(room.matches) if room else 0,'closes_at':deadline}}
+                           'flow':room.flow.summary() if room else {},'matches':len(room.matches) if room else 0,'closes_at':deadline}}

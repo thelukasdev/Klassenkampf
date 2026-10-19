@@ -61,7 +61,8 @@ class GameSessions:
             self.rooms[room_id] = room
         return room
 
-    def create(self, name, mode='choose'):
+    def create(self, name, mode='choose',waiting_room=False):
+        if type(waiting_room) is not bool:raise ValueError('Ungültige Warteraum-Einstellung.')
         name = ' '.join(str(name).split())
         if not name or len(name)>80 or any(ord(c)<32 for c in name):
             raise ValueError('Bitte einen Sitzungsnamen mit 1 bis 80 Zeichen eingeben.')
@@ -76,7 +77,7 @@ class GameSessions:
                 if not db.execute('SELECT 1 FROM game_rooms WHERE code=?',(code,)).fetchone():
                     break
             room_id=secrets.token_hex(12)
-            state={'players':{},'banned':[],'mode':mode}
+            state={'players':{},'banned':[],'mode':mode,'rules':{'waiting_room':waiting_room,'waiting_released':False}}
             db.execute('INSERT INTO game_rooms VALUES(?,?,?,?,?,NULL,?)',
                        (room_id,name,code,1,int(time.time()),json.dumps(state)))
         self.get(room_id)
@@ -102,6 +103,7 @@ class GameSessions:
         if not room.room_active:
             raise ValueError('Diese Spielsitzung ist bereits beendet.')
         room.room_active=False
+        room.flow.cancel_all()
         with self.store.connect() as db:
             db.execute('UPDATE game_rooms SET active=0,ended=? WHERE id=?',(int(time.time()),room_id))
         # Administrative end is neutral: no invented wins or losses.
@@ -153,7 +155,7 @@ class GameSessions:
     async def action(self,obj):
         action=obj.get('action')
         if action=='create-session':
-            return self.create(obj.get('value',''),obj.get('mode','choose'))
+            return self.create(obj.get('value',''),obj.get('mode','choose'),obj.get('waiting_room',False))
         if action=='sessions':
             return self.summaries()
         room_id=str(obj.get('session',''))
@@ -184,7 +186,7 @@ class GameSessions:
                           'matches':len(room.matches) if room else 0,'connections':len(room.joined_connections) if room else 0},
                 'code':room.login_code if room and room.room_active else None,
                 'saves':room.admin_list_saves() if room else [],
-                'rules':room.rules if room else {},'history':room.history if room else [],
+                'flow':room.flow.summary() if room else {},'rules':room.rules if room else {},'history':room.history if room else [],
                 'replays':self.server.replays.metadata(room.room_id) if room else [],
                 'matches_detail':[{'id':m.id,'game':m.gid,'name':m.name,'players':[p.nick for p in m.active],
                                    'recording':bool(m.recorder and not m.recorder.closed),'replay_partial':bool(m.recorder and m.recorder.truncated),

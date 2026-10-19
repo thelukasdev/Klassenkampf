@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 89 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 96 Tests geprüft.
 
 ## Anleitungen
 
@@ -95,3 +95,5 @@ Automatische Wiederverbindung mit 30 Sekunden Partiepause: siehe [WIEDERVERBINDU
 Raumadressen ohne Beitrittscode und weiterhin direkte Einladungen: [RAUMADRESSEN.md](RAUMADRESSEN.md).
 
 Öffentliche Demos für Vier gewinnt und Tennis42 gegen lokale Bots: [DEMO.md](DEMO.md). Zusätzliche Bot-/Regeltests für die Entwicklung: `node --test tests/test_demo_engine.cjs tests/test_demo_tennis.cjs` (14 Tests). Der Produktivserver benötigt dafür kein Node.js.
+
+Revanche, Viererabstimmung und optionaler Warteraum: [RUNDENABLAUF.md](RUNDENABLAUF.md).

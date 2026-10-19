@@ -126,6 +126,7 @@ class Player:
         self.conn = None          # Conn oder None (offline)
         self.match = None         # Match oder None
         self.role = 0             # 1 oder 2 im Match
+        self.ready = False
         self.out_challenge = None  # Challenge oder None (eigene Herausforderung)
 
     @property
@@ -396,9 +397,11 @@ class Server:
         # Unsichtbarer Zaehler: gid -> [Summe Dauer (s), Anzahl Partien].
         # Wird nirgends angezeigt, nur beim Beenden ausgewertet.
         self.game_stats = {}
-        self.rules={'enabled':list(games.GAMES),'paused':False,'speed':1,
+        self.rules={'enabled':list(games.GAMES),'paused':False,'speed':1,'waiting_room':False,'waiting_released':False,
                     'credits_win':CREDIT_WIN,'credits_loss':CREDIT_LOSS,'credits_draw':CREDIT_DRAW}
         self.history=[]
+        from round_flow import RoundFlow
+        self.flow=RoundFlow(self)
         self.worker=None
         if room_id and os.environ.get('KLASSENKAMPF_WORKERS','1')=='1':
             from game_worker import SessionWorker
@@ -486,6 +489,7 @@ class Server:
                 "credits": p.credits,
                 "online": p.online,
                 "busy": p.busy,
+                "ready": p.ready,
                 "you": p is me,
                 "wl": [sum(r[0] for r in p.record.values()),
                        sum(r[1] for r in p.record.values())],
@@ -509,7 +513,7 @@ class Server:
         return {"t": "lobby", "players": players, "incoming": incoming,
                 "session_name":getattr(self,'room_name',None),
                 "watch":[{'name':m.name,'players':[p.nick for p in m.players],'url':'/watch#'+m.spectator_token} for m in self.matches.values() if m.spectator_token],
-                "outgoing": out, "mode": self.mode,"enabled_games":self.rules['enabled'],"paused":self.rules['paused'],
+                "flow":self.flow.view(me),"outgoing": out, "mode": self.mode,"enabled_games":self.rules['enabled'],"paused":self.rules['paused'],
                 "you": {"nick": me.nick, "credits": me.credits,
                         "record": me.record}}
 
@@ -537,7 +541,7 @@ class Server:
 
     async def _maybe_start(self, c, force=False):
         """Herausforderung starten, wenn niemand mehr aussteht (oder force)."""
-        if self.rules['paused'] or (c.gid and c.gid not in self.rules['enabled']): return
+        if self.flow.waiting or self.rules['paused'] or (c.gid and c.gid not in self.rules['enabled']): return
         if c.src.out_challenge is not c or c.src.busy or not c.src.online:
             return
         acc = [self.by_pid[q] for q, st in c.targets.items()
@@ -573,12 +577,15 @@ class Server:
 
     # ----- Matches -----
     def start_match(self, gid, players):
+        if self.flow.waiting:raise ValueError('Die Spielleitung hat den Warteraum noch nicht freigegeben.')
         if self.rules['paused'] or gid not in self.rules['enabled']:
             raise ValueError('Dieses Spiel ist pausiert oder nicht freigegeben.')
         if len(self.matches)>=16: raise ValueError('Zu viele gleichzeitige Partien.')
         if self.hub:
             live=sum(bool(r.matches) for r in self.hub.rooms.values())
             if not self.matches and live>=8: raise ValueError('Serverkapazitaet erreicht. Bitte spaeter starten.')
+        if len(players)<2 or len(players)>games.GAMES[gid].max_players or len({p.pid for p in players})!=len(players) or any(p.busy for p in players):raise ValueError('Teilnehmer nicht verfügbar.')
+        for p in players:self.flow.drop(p)
         m = Match(self, gid, players)
         self.matches[m.id] = m
         m.task = asyncio.create_task(m.run())
@@ -607,6 +614,7 @@ class Server:
                 p.match = None
                 p.role = 0
         self.matches.pop(m.id, None)
+        self.flow.completed(m)
         self.save()
         asyncio.create_task(self.push_lobby())
 
@@ -834,7 +842,7 @@ class Server:
         if self.session_hub:
             return await self.session_hub.action(obj)
         action = obj['action']
-        if action in ('rules','pause-match','end-match','remove-player','move-player','spectators'):
+        if action in ('rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room'):
             return await self.control.action(obj)
         value = str(obj.get('value', ''))
         if action == 'status':
@@ -952,6 +960,10 @@ class Server:
         if player is None:
             return player  # alle weiteren Befehle brauchen einen Namen
 
+        if t in ('ready','round_vote','round_leave'):
+            try:await self.flow.handle(player,obj)
+            except ValueError as exc:await conn.send({'t':'err','msg':str(exc)})
+            return player
         if t == "lobby":
             await conn.send(self.lobby_view(player))
 
@@ -1044,6 +1056,8 @@ class Server:
     async def _challenge(self, player, obj):
         """Gegner herausfordern. Bei Mehrspieler-Spielen kann man nacheinander
         bis zu max_players-1 Gegner zur selben Herausforderung hinzufuegen."""
+        if self.flow.waiting:
+            await player.conn.send({'t':'err','msg':'Warte auf die Freigabe der Spielleitung.'});return
         if self.rules['paused']:
             await player.conn.send({'t':'err','msg':'Die Sitzung ist pausiert.'}); return
         if player.busy:
@@ -1064,6 +1078,7 @@ class Server:
         if not target.online or target.busy:
             await player.conn.send({"t": "err", "msg": "Gegner nicht verfuegbar"})
             return
+        self.flow.drop(player)
         c = player.out_challenge
         if c and c.gid == gid:
             if target.pid in c.targets:
@@ -1093,6 +1108,7 @@ class Server:
         if player.busy or src.busy or not src.online:
             await player.conn.send({"t": "err", "msg": "Nicht mehr verfuegbar"})
             return
+        self.flow.drop(player);self.flow.drop(src)
         player.out_challenge = None            # eigene Herausforderung zurueckziehen
         for oc in self._withdraw(player, keep=c):
             await self._maybe_start(oc)
@@ -1101,6 +1117,7 @@ class Server:
         await self.push_lobby()
 
     async def _on_disconnect(self, player, reconnect=True):
+        player.ready=False;self.flow.drop(player)
         player.conn = None
         player.out_challenge = None
         for oc in self._withdraw(player):
@@ -1112,7 +1129,9 @@ class Server:
 
     # ----- Admin (laufen auf dem Loop-Thread via run_coroutine_threadsafe) -----
     async def _kick_conn(self, p, msg):
+        p.ready=False;self.flow.drop(p)
         if p.match and not p.match.finished:
+            p.match.followup_blocked=True
             await p.match.abort(p)
         if p.conn:
             await p.conn.send({"t": "kicked", "msg": msg})
@@ -1289,6 +1308,16 @@ class Server:
                     except Exception:logging.exception('Host session cleanup failed')
                 try:await asyncio.wait_for(stop.wait(),10)
                 except asyncio.TimeoutError:pass
+        async def flow_maintenance():
+            while not stop.is_set():
+                rooms=list(self.session_hub.rooms.values()) if self.session_hub else [self]
+                for room in rooms:
+                    try:
+                        if room.flow.prune():await room.push_lobby()
+                    except Exception:logging.exception('Round flow maintenance failed')
+                try:await asyncio.wait_for(stop.wait(),1)
+                except asyncio.TimeoutError:pass
+        flow_task=asyncio.create_task(flow_maintenance())
         maintenance=asyncio.create_task(replay_maintenance())
         hosts_task=asyncio.create_task(host_maintenance())
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -1308,6 +1337,7 @@ class Server:
             stop.set()
             await maintenance
             await hosts_task
+            await flow_task
             for listener in (app, admin):
                 if listener:
                     listener.close()

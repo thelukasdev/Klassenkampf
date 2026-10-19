@@ -46,6 +46,9 @@
     socket.onmessage=event=>{if(ws!==socket)return;lastReceived=Date.now();handle(JSON.parse(event.data));};
     socket.onclose=()=>lost(socket);socket.onerror=()=>{};
   }
+  window.addEventListener('round-command',event=>sendMsg(event.detail));
+  window.addEventListener('round-exit',()=>{match=null;snap=null;$('overlay').classList.remove('active');show('lobby');sendMsg({t:'lobby'});});
+  window.addEventListener('round-notice',event=>toast(event.detail));
   function sendMsg(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
   setInterval(()=>{if(ws&&ws.readyState===1){if(Date.now()-lastReceived>35000)lost(ws);else sendMsg({t:'ping'});}},10000);
   setInterval(()=>{
@@ -79,12 +82,12 @@
         me.nick = m.nick; me.tok=m.tok; lsSet('cw_nick', m.nick); lsSet('cw_tok', m.tok);
         lsSet('cw_profile_' + me.code, JSON.stringify({nick:m.nick,tok:m.tok}));
         break;
-      case 'session_ended':
+      case 'session_ended':window.clearRoundFlow?.();
         reconnectAllowed=true;transportLost=false;pauseState=null;connectionNotice('');
         lsDel('cw_code'); tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); me.code = null; me.nick = null;me.tok=null;
         $('loginErr').textContent = m.msg; show('login');
         break;
-      case 'lobby': lobbyState = m; buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
+      case 'lobby': lobbyState = m;window.renderRoundFlow?.(m.flow); buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
       case 'challenged': toast(m.nick + ' fordert dich heraus' + (m.gname ? ': ' + m.gname : '')); break;
       case 'match_start': startMatch(m); break;
       case 'state': snap = m.s; if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;
@@ -130,7 +133,7 @@
     if (cur === 'game' && !confirm('Sitzung wechseln und die laufende Partie verlassen?')) return;
     if(cur==='game')sendMsg({t:'leave'});
     clearTimeout(retryTimer);reconnectAllowed=true;pauseState=null;transportLost=false;connectionNotice('');ws.onclose = null; ws.close();
-    tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); lsDel('cw_code');
+    window.clearRoundFlow?.();tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); lsDel('cw_code');
     me = {code:null,nick:null,credits:0}; match = null; snap = null;
     $('codeInput').value = ''; $('loginErr').textContent = '';
     show('login'); connect();
@@ -170,10 +173,10 @@
     if (!lobbyState) return;
     $('meNick').textContent = me.nick || '–';
     $('meCred').textContent = (me.credits >= 0 ? '+' : '') + me.credits;
-    const random = clientMode === 'random';
-    $('gameSelect').classList.toggle('hidden', random);
-    $('modeNote').classList.toggle('hidden', !random);
-    $('challengeHead').textContent = lobbyState.paused?'Sitzung pausiert':random ? 'Gegner herausfordern' : '2 · Gegner herausfordern';
+    const random = clientMode === 'random', waiting=!!lobbyState.flow?.waiting;
+    $('gameSelect').classList.toggle('hidden', random||waiting);
+    $('modeNote').classList.toggle('hidden', !random||waiting);
+    $('challengeHead').textContent = waiting?'Warte auf Freigabe':lobbyState.paused?'Sitzung pausiert':random ? 'Gegner herausfordern' : '2 · Gegner herausfordern';
     buildChips();
     renderRanking();
     const watches=$('watchList');watches.replaceChildren();
@@ -215,7 +218,8 @@
       row.innerHTML = `<span class="dot ${st}"></span>
         <span class="pn">${esc(p.nick || '—')}</span>
         <span class="pcred">${p.credits >= 0 ? '+' : ''}${p.credits}</span>`;
-      if (!p.you) {
+      if(waiting){const tag=document.createElement('span');tag.className='tag';tag.textContent=p.ready?'Bereit':'Noch nicht bereit';row.append(tag);}
+      else if (!p.you) {
         if (targeted.has(p.pid)) {
           const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'gefordert'; row.appendChild(t);
         } else if (p.online && !p.busy && !lobbyState.paused) {
@@ -236,6 +240,7 @@
 
   // ---------------- Match ----------------
   function startMatch(m) {
+    window.clearRoundFlow?.();
     pauseState=null;connectionNotice('');
     match = { gid: m.game, role: m.role, opp: m.opp };
     snap = null;
@@ -262,11 +267,11 @@
     $('resCred').textContent = (m.credits >= 0 ? '+' : '') + m.credits;
     $('overlay').classList.add('active');
   }
-  $('backBtn').onclick = () => { match = null; snap = null; $('overlay').classList.remove('active'); show('lobby'); sendMsg({ t: 'lobby' }); };
+  $('backBtn').onclick = () => { sendMsg({t:'round_leave'});window.clearRoundFlow?.(); match = null; snap = null; $('overlay').classList.remove('active'); show('lobby'); sendMsg({ t: 'lobby' }); };
   $('leaveBtn').onclick = () => {
     if (match && !$('overlay').classList.contains('active')) {
       if (confirm('Aufgeben zählt als Niederlage. Wirklich aufgeben?')) sendMsg({ t: 'leave' });
-    } else { match = null; snap = null; $('overlay').classList.remove('active'); show('lobby'); sendMsg({ t: 'lobby' }); }
+    } else { sendMsg({t:'round_leave'});window.clearRoundFlow?.();match = null; snap = null; $('overlay').classList.remove('active'); show('lobby'); sendMsg({ t: 'lobby' }); }
   };
 
   // ---------------- Eingabe ----------------

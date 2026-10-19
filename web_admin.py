@@ -380,7 +380,7 @@ class WebAdmin:
                         db.execute('DELETE FROM admin_passwords WHERE email=?',(email,))
                 result='Zugriff aktualisiert'
             elif action in ('kick','ban','unban','reset-credits','mode','save','load','create-session','end-session',
-                            'rules','pause-match','end-match','remove-player','move-player','spectators'):
+                            'rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room'):
                 if self.server.session_hub:
                     if action=='create-session':
                         if session['role']=='host':
