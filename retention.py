@@ -48,8 +48,9 @@ def cleanup(server,now=None):
             db.execute('DELETE FROM replay_shares WHERE replay_id IN (SELECT id FROM replays WHERE room_id=?)',(rid,))
             db.execute('DELETE FROM replays WHERE room_id=?',(rid,))
             db.execute('DELETE FROM game_rooms WHERE id=?',(rid,))
-        db.execute('DELETE FROM issue_reports WHERE (resolved=1 AND resolved_at<=?) OR (resolved=0 AND created<=?)',
+        db.execute('DELETE FROM issue_reports WHERE (resolved=1 AND resolved_at<=?) OR (resolved=0 AND COALESCE(last_activity,created)<=?)',
                    (now-RESOLVED_REPORT_DAYS*DAY,now-REPORT_DAYS*DAY))
+        db.execute('DELETE FROM report_messages WHERE report_id NOT IN (SELECT id FROM issue_reports)')
         db.execute('DELETE FROM audit WHERE time<=?',(now-AUDIT_DAYS*DAY,))
         for table in ('sessions','oauth','player_codes','player_resets','mfa_pending'):
             db.execute('DELETE FROM '+table+' WHERE expires<=?',(now,))

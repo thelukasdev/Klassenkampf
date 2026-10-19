@@ -202,6 +202,8 @@ class WebAdmin:
                     db.execute('DELETE FROM replay_shares WHERE replay_id IN (SELECT p.id FROM replays p WHERE p.room_id IN (SELECT room_id FROM session_access WHERE email=? UNION SELECT room_id FROM host_rooms WHERE email=?))',(identity,identity))
                     db.execute('DELETE FROM host_rooms WHERE email=?',(identity,))
                 db.execute('DELETE FROM player_permissions WHERE email=?',(email,))
+                db.execute('DELETE FROM report_messages WHERE report_id IN (SELECT id FROM issue_reports WHERE owner=?)',(identity,))
+                db.execute('DELETE FROM issue_reports WHERE owner=?',(identity,))
                 db.execute('DELETE FROM player_accounts WHERE email=?',(email,))
                 db.execute("DELETE FROM admins WHERE email=? AND role='host'",(identity,))
                 db.execute('DELETE FROM session_access WHERE email=?',(identity,))
@@ -220,7 +222,7 @@ class WebAdmin:
         if player_scope:route=route.replace('/api/player/','/api/admin/',1)
         try:
             if route.startswith('/auth/report/'):
-                await self.reports.handle(reader,writer,method,route,headers);return
+                await self.reports.handle(reader,writer,method,path,headers);return
             if route.startswith('/auth/player/'):
                 await self.player_auth.handle(reader,writer,method,route,headers);return
             if route.startswith('/auth/google/'):
@@ -254,6 +256,10 @@ class WebAdmin:
                     pass
                 elif not (method=='POST' and route=='/api/admin/action'):
                     raise Denied('Für Spielerkonten nicht verfügbar.')
+            if route=='/api/admin/report' and method=='GET':
+                if session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Tickets sehen.')
+                query=parse_qs(urlsplit(path).query)
+                await self.respond(writer,200,self.reports.detail(session,query.get('reference',[''])[0],query));return
             if route=='/api/admin/reports' and method=='GET':
                 await self.respond(writer,200,self.reports.list(session,parse_qs(urlsplit(path).query)));return
             if route=='/api/admin/accounts' and method=='GET':
@@ -323,7 +329,7 @@ class WebAdmin:
             if headers.get('transfer-encoding') or headers.get('content-type','').split(';')[0] != 'application/json':
                 raise ValueError('JSON-Anfrage erforderlich.')
             length = int(headers.get('content-length','0'))
-            if not 0 < length <= 4096:
+            if not 0 < length <= 12000:
                 raise ValueError('Anfrage zu gross.')
             obj = json.loads(await asyncio.wait_for(reader.readexactly(length), 5))
             if not isinstance(obj, dict):
@@ -336,6 +342,11 @@ class WebAdmin:
                 key=self.server.replays.share(room_id,value,action=='revoke-replay')
                 self.store.log(session['email'],action,room_id+' '+value)
                 result={'url':self.origin+'/replay#'+key} if key else {'revoked':True}
+            elif action=='reply-report':
+                result=await self.reports.reply(session,value,obj.get('message'),obj.get('request_id'))
+            elif action=='retry-report-email':
+                status=await self.reports.notify(session,value,obj.get('message_id'))
+                result='E-Mail versendet.' if status=='sent' else 'E-Mail konnte noch nicht versendet werden.'
             elif action=='resolve-report':
                 self.reports.resolve(session,value,obj.get('resolved'))
                 result='Meldung aktualisiert.'

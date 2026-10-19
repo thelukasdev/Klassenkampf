@@ -742,6 +742,7 @@ class Server:
         if re.fullmatch(r'/raum/[0-9a-f]{64}/?',path):path='/index.html'
         if path in ('/demo/tennis','/demo/tennis/'):path='/demo-tennis.html'
         if path in ('/demo','/demo/'):path='/demo.html'
+        if path in ('/tickets','/tickets/') or re.fullmatch(r'/tickets/KK-[A-F0-9]{12}/?',path):path='/tickets.html'
         if path in ('/report','/report/'):path='/report.html'
         if path in ('/account/security','/account/security/'):
             path='/security.html'

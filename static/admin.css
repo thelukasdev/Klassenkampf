@@ -39,3 +39,9 @@ input:not([type=radio]):not([type=checkbox]),select,.session-toolbar select{back
 footer .legal-link{font-size:11px;color:#a9c8c0;text-decoration:none;margin-left:12px;white-space:nowrap}footer{flex-wrap:wrap}
 
 .waiting-check{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.6}.waiting-check input[type=checkbox]{width:18px;height:18px;padding:0;flex-shrink:0;accent-color:#73d363}
+
+#reportDialog{width:min(680px,calc(100% - 24px));max-width:680px;max-height:90svh;overflow-y:auto}#reportDialog textarea{font:inherit;width:100%;padding:12px;border:1px solid #cbd8c5;border-radius:8px;resize:vertical;font-size:13px}.ticket-message{border:1px solid #dce4d7;border-radius:9px;padding:14px;margin:14px 0}.ticket-message.admin{background:#15231a;border-color:#467346}.ticket-message strong,.ticket-message small{display:block}.ticket-message small{margin:7px 0;color:#7a8871;font-size:11px}.ticket-message p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}#reportDialogNotice{font-size:12px;margin:16px 0;overflow-wrap:anywhere}#reportDialogClose{margin-top:12px}
+
+#reportDialogStatus{overflow-wrap:anywhere}
+
+#reportDialog .ticket-message{color:#e8ece8;border-color:#344149}#reportDialog .ticket-message p{color:#e8ece8}#reportDialog .ticket-message strong{color:#a9e89b}#reportDialog .ticket-message small{color:#9fb1a5}#reportDialog textarea{background:#0c1013;color:#e8ece8;border-color:#344149}

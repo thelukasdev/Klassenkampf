@@ -3,3 +3,5 @@ textarea,select{font:inherit;width:100%;padding:12px;background:#0c1013;border:1
 .delete-account{margin-top:30px;padding-top:20px;border-top:1px solid #65333a}.delete-account h2{font-size:20px;color:#ff9ca7}.delete-account p{font-size:12px;line-height:1.7}#deleteAccountSubmit{background:#a11e34;border-color:#ef4c65;color:#fff}
 
 .waiting-check{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.6}.waiting-check input[type=checkbox]{width:18px;height:18px;padding:0;flex-shrink:0;accent-color:#73d363}
+
+.tickets-link{display:block;text-align:center;margin-bottom:20px}
