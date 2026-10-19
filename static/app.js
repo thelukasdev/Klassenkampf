@@ -1,6 +1,9 @@
 /* Klassenkampf Client: WebSocket, Screens, Lobby, Eingabe, Render-Loop. */
 (function () {
   const $ = (id) => document.getElementById(id);
+  const bootTimer=setTimeout(()=>{if($('bootScreen').hidden)return;$('bootMessage').textContent='Die Verbindung dauert länger. Wir versuchen es weiter …';$('bootRetry').hidden=false;},8000);
+  $('bootRetry').onclick=()=>location.reload();
+  function finishBoot(){clearTimeout(bootTimer);$('bootScreen').hidden=true;document.body.classList.remove('booting');document.body.removeAttribute('aria-busy');}
   const screens = ['login', 'nick', 'lobby', 'game'];
   function show(name) { screens.forEach(s => $(s).classList.toggle('active', s === name)); cur = name; }
   const canvas = $('c'), ctx = canvas.getContext('2d');
@@ -55,7 +58,7 @@
   function handle(m) {
     switch (m.t) {
       case 'pong': break;
-      case 'welcome': transportLost=false;connectionNotice('');gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); tryAutoLogin(); break;
+      case 'welcome':finishBoot();transportLost=false;connectionNotice('');gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); tryAutoLogin(); break;
       case 'login_ok':
         me.code = m.code;
         lsSet('cw_code', m.code);
