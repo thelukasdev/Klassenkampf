@@ -730,6 +730,7 @@ class Server:
             await self._http_response(writer,404,b'Not found')
             return
         if re.fullmatch(r'/raum/[0-9a-f]{64}/?',path):path='/index.html'
+        if path in ('/demo','/demo/'):path='/demo.html'
         if path in ('/report','/report/'):path='/report.html'
         if path in ('/account/security','/account/security/'):
             path='/security.html'

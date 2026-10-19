@@ -93,3 +93,5 @@ Kontolöschung und automatische Löschfristen: siehe [DATENLOESCHUNG.md](DATENLO
 Automatische Wiederverbindung mit 30 Sekunden Partiepause: siehe [WIEDERVERBINDUNG.md](WIEDERVERBINDUNG.md).
 
 Raumadressen ohne Beitrittscode und weiterhin direkte Einladungen: [RAUMADRESSEN.md](RAUMADRESSEN.md).
+
+Öffentliche Vier-gewinnt-Demo gegen einen lokalen Bot: [DEMO.md](DEMO.md). Zusätzliche Bot-/Regeltests für die Entwicklung: `node --test tests/test_demo_engine.cjs` (8 Tests). Der Produktivserver benötigt dafür kein Node.js.
