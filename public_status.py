@@ -242,7 +242,8 @@ def make_handler(store,static_dir):
                     files={'/status':'status.html','/status/':'status.html','/status/status.css':'status.css',
                            '/status/cookie-notice.js':'cookie-notice.js','/status/cookie-notice.css':'cookie-notice.css',
                            '/status/status.js':'status.js','/status/lp-logo.png':'lp-logo.png'}
-                    if route.path not in files:self.reply(404,b'Not found','text/plain');return
+                    if route.path not in files:
+                        self.reply(404,(static_dir/'404.html').read_bytes(),'text/html; charset=utf-8');return
                     name=files[route.path];body=(static_dir/name).read_bytes()
                     ctype={'html':'text/html; charset=utf-8','css':'text/css; charset=utf-8','js':'application/javascript; charset=utf-8','png':'image/png'}[name.rsplit('.',1)[1]]
                 self.reply(200,body,ctype)

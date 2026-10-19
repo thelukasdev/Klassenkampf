@@ -734,6 +734,8 @@ class Server:
         if path.rstrip('/') in ('/impressum','/datenschutz'):
             from legal_pages import serve
             await serve(writer,method,path.strip('/'),Path(self.web_admin.store.path).parent);return
+        if path in ('/404','/404/','/404.html'):
+            await self._not_found(writer,method);return
         if path == '/internal/status.json':
             await self._http_response(writer,404,b'Not found')
             return
@@ -761,7 +763,7 @@ class Server:
             path = "/index.html"
         safe = path.lstrip('/')
         if '\\' in safe or '..' in Path(safe).parts or '\x00' in safe:
-            await self._http_response(writer, 404, b'Not found')
+            await self._not_found(writer,method)
             return
         if Path(safe).name.lower()=='report.html' and not self.web_admin.reports.session(headers or {}):
             await self.web_admin.respond(writer,303,location='/login');return
@@ -775,9 +777,8 @@ class Server:
                 with open(full, "rb") as f:
                     body = f.read()
         if body is None:
-            body = b"404 Not Found"
-            writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: %d\r\n"
-                         b"Connection: close\r\n\r\n%s" % (len(body), body))
+            await self._not_found(writer,method)
+            return
         else:
             ctype = MIME.get(ext, "application/octet-stream")
             header = (f"HTTP/1.1 200 OK\r\nContent-Type: {ctype}\r\n"
@@ -789,6 +790,16 @@ class Server:
             await writer.drain()
         except ConnectionError:
             pass
+        writer.close()
+
+    async def _not_found(self,writer,method='GET'):
+        if _EMBED is not None:body=_EMBED.get('404.html',b'Seite nicht gefunden')
+        else:body=(Path(STATIC)/'404.html').read_bytes()
+        writer.write((f'HTTP/1.1 404 Not Found\r\nContent-Type: text/html; charset=utf-8\r\n'
+                      f'Content-Length: {len(body)}\r\nCache-Control: no-store\r\n'
+                      'Connection: close\r\n\r\n').encode()+(b'' if method=='HEAD' else body))
+        try:await writer.drain()
+        except ConnectionError:pass
         writer.close()
 
     async def _http_response(self, writer, status, body, *, head=False):

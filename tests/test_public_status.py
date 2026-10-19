@@ -142,6 +142,10 @@ class StatusFeedTests(unittest.IsolatedAsyncioTestCase):
             store.observe(items)
             self.assertEqual(next(i['state'] for i in items if i['id']=='websocket'),'operational')
             self.assertEqual((await asyncio.to_thread(get,'/status'))[0],200)
+            with self.assertRaises(urllib.error.HTTPError) as missing:
+                await asyncio.to_thread(get,'/status/fehlt')
+            self.assertEqual(missing.exception.code,404)
+            self.assertIn(b'Seite nicht gefunden',missing.exception.read())
             self.listener.close();await self.listener.wait_closed()
             items=await asyncio.to_thread(probe,store,target,token,'https://games.example.org');store.observe(items)
             status,body=await asyncio.to_thread(get,'/api/status')

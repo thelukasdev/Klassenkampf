@@ -109,6 +109,23 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b'200 OK', await self.http('/admin'))
         self.assertIn(b'401', await self.http('/api/admin/overview'))
 
+    async def test_missing_pages_return_branded_html_with_real_404(self):
+        for path in ('/gibt-es-nicht','/404','/404.html','/x/%3Cscript%3E'):
+            response=await self.http(path)
+            headers,body=response.split(b'\r\n\r\n',1)
+            self.assertIn(b'404 Not Found',headers)
+            self.assertIn(b'Content-Type: text/html; charset=utf-8',headers)
+            self.assertIn(b'Seite nicht gefunden',body)
+            self.assertIn(b'/lp-logo.png',body)
+            self.assertIn(b'Zur Startseite',body)
+            self.assertNotIn(b'<script>',body)
+
+    async def test_missing_page_head_has_no_body_and_same_length(self):
+        get=await self.http('/fehlt');head=await self.http('/fehlt',method='HEAD')
+        gh,gb=get.split(b'\r\n\r\n',1);hh,hb=head.split(b'\r\n\r\n',1)
+        self.assertIn(b'404 Not Found',hh);self.assertEqual(hb,b'')
+        self.assertIn(('Content-Length: '+str(len(gb))).encode(),hh)
+
     async def test_admin_auth_snapshot_and_mode(self):
         request = dict(port=self.admin_port, method='POST', data={'action': 'status'})
         self.assertIn(b'401', await self.http('/admin', **request))
