@@ -22,6 +22,7 @@ import json
 import os
 import random
 import secrets
+import math
 import sys
 import threading
 import time
@@ -170,6 +171,9 @@ class Challenge:
         self.targets = {}         # pid -> "pending" | "accepted"
 
 
+RECONNECT_SECONDS = 30
+
+
 class Match:
     _next_id = 1
 
@@ -185,6 +189,8 @@ class Match:
             from game_worker import RemoteGame
             self.game = RemoteGame(server.worker,self.id,gid,len(players))
         self.paused=False
+        self.disconnected={}
+        self.next_connection_notice=0
         self.outcomes={}
         self.initial_credits={p.nick:p.credits for p in players}
         self.end_reason='normal'
@@ -207,6 +213,45 @@ class Match:
     def active(self):
         return [p for p in self.players if p not in self.left]
 
+    @property
+    def is_paused(self):
+        return bool(self.paused or self.server.rules['paused'] or self.disconnected)
+
+    def start_message(self,p):
+        names=[q.nick for q in self.players]
+        return {'t':'match_start','game':self.gid,'name':self.name,'role':p.role,
+                'opp':' / '.join(q.nick for q in self.players if q is not p),'names':names}
+
+    async def pause_notice(self):
+        if self.is_paused:self.game.reset_inputs()
+        now=time.monotonic()
+        message={'t':'match_pause','paused':self.is_paused,'waiting':[{'nick':p.nick,'seconds':max(0,math.ceil(deadline-now))} for p,deadline in self.disconnected.items()]}
+        for p in self.active:await self._send(p,message)
+        self.next_connection_notice=now+1
+
+    async def wait_for_player(self,p):
+        if self.finished or p in self.left or p in self.disconnected:return
+        self.disconnected[p]=time.monotonic()+RECONNECT_SECONDS
+        await self.pause_notice()
+
+    async def expire_connections(self):
+        expired=[p for p,deadline in self.disconnected.items() if deadline<=time.monotonic()]
+        if not expired or self.finished:return
+        if not any(p.online for p in self.active):
+            await self.server.control.cancel_match(self,'connection_lost');return
+        for p in expired:
+            if self.finished:break
+            await self.abort(p,reason='connection_timeout')
+
+    async def resume_player(self,p):
+        self.game.reset_inputs()
+        self.disconnected.pop(p,None)
+        await self._send(p,self.start_message(p))
+        if self.last_frame:
+            views=self.last_frame['views']
+            await self._send(p,{'t':'state','s':views[str(p.role) if self.game.per_view else '0']})
+        await self.pause_notice()
+
     async def run(self):
         g = self.game
         dt = g.tick_ms / 1000.0
@@ -219,7 +264,12 @@ class Match:
         next_t = loop.time()
         try:
             while not self.finished:
-                if self.paused or self.server.rules['paused']:
+                for p in self.active:
+                    if p.conn is not None and not p.online:await self.wait_for_player(p)
+                await self.expire_connections()
+                if self.finished:break
+                if self.disconnected and loop.time()>=self.next_connection_notice:await self.pause_notice()
+                if self.is_paused:
                     next_t=loop.time()
                     await asyncio.sleep(.1)
                     continue
@@ -275,22 +325,25 @@ class Match:
                                  "credits": p.credits,"delta":p.credits-self.initial_credits[p.nick], "reason": "normal"})
         self.server.close_match(self)
 
-    async def abort(self, quitter):
+    async def abort(self, quitter,reason="leave"):
         """Ein Spieler bricht ab / verliert die Verbindung. Zu zweit gewinnt der
         Gegner; zu mehreren scheidet nur der Abbrechende aus."""
         if self.finished or quitter in self.left:
             return
-        self.end_reason="leave"
+        self.end_reason=reason
+        self.disconnected.pop(quitter,None)
         rest = [p for p in self.active if p is not quitter]
+        self.left.add(quitter)
+        if len(rest)==1:self.finished=True
         self._award(quitter, "loss")
         await self._send(quitter, {"t": "match_end", "result": "loss",
-                                   "credits": quitter.credits,"delta":quitter.credits-self.initial_credits[quitter.nick], "reason": "you_left"})
+                                   "credits": quitter.credits,"delta":quitter.credits-self.initial_credits[quitter.nick], "reason": "you_disconnected" if reason=="connection_timeout" else "you_left"})
         if len(rest) == 1:
             self.finished = True
             winner = rest[0]
             self._award(winner, "win")
             await self._send(winner, {"t": "match_end", "result": "win",
-                                      "credits": winner.credits,"delta":winner.credits-self.initial_credits[winner.nick], "reason": "opp_left"})
+                                      "credits": winner.credits,"delta":winner.credits-self.initial_credits[winner.nick], "reason": "opp_disconnected" if reason=="connection_timeout" else "opp_left"})
             self.server.close_match(self)
             return
         self.left.add(quitter)
@@ -299,6 +352,7 @@ class Match:
         self.game.remove_player(self.players.index(quitter) + 1)
         for p in rest:
             await self._send(p, {"t": "info", "msg": f"{quitter.nick} hat aufgegeben"})
+        await self.pause_notice()
         asyncio.create_task(self.server.push_lobby())
 
     def _award(self, p, outcome):
@@ -532,6 +586,7 @@ class Server:
 
     def close_match(self, m):
         m.spectator_token=None
+        m.disconnected.clear()
         if m.recorder:m.recorder.finish(m.end_reason)
         if not m.recorded:
             m.recorded=True
@@ -632,7 +687,7 @@ class Server:
                 await self.web_admin.respond(writer,404,{'error':'Freigabe beendet oder nicht verfügbar.'})
             else:
                 await self.web_admin.respond(writer,200,{'game':match.gid,'name':match.name,'players':[p.nick for p in match.players],
-                    'paused':match.paused or match.server.rules['paused'],'frame':match.last_frame})
+                    'paused':match.is_paused,'frame':match.last_frame})
         elif urlsplit(path).path=='/internal/status.json':
             token=os.environ.get('KLASSENKAMPF_STATUS_TOKEN','')
             if method!='GET' or not token or not secrets.compare_digest(headers.get('authorization','').encode(),('Bearer '+token).encode()):
@@ -819,7 +874,7 @@ class Server:
         await conn.send({"t": "welcome", "games": games.GAME_INFO, "mode": self.mode})
         try:
             while True:
-                msg = await asyncio.wait_for(wsutil.read_message(reader), 120)
+                msg = await asyncio.wait_for(wsutil.read_message(reader), 45)
                 if msg is None:
                     break
                 opcode, data = msg
@@ -840,6 +895,8 @@ class Server:
                     continue
                 if not isinstance(obj, dict):
                     continue
+                if obj.get('t')=='ping':
+                    await conn.send({'t':'pong'});continue
                 player = await self._on_message(conn, player, obj)
         finally:
             conn.alive = False
@@ -920,7 +977,7 @@ class Server:
             await self.push_lobby()
 
         elif t == "in":
-            if player.match and not player.match.finished:
+            if player.match and not player.match.finished and not player.match.is_paused:
                 try:
                     player.match.game.set_input(player.role, int(obj.get("u", 0)) & 0x3F)
                 except (ValueError, TypeError):
@@ -958,11 +1015,12 @@ class Server:
             p.conn.alive = False
             p.conn.writer.close()
         if player is not None and player is not p and player.conn is conn:
-            await self._on_disconnect(player)   # Namenswechsel in derselben Verbindung
+            await self._on_disconnect(player,reconnect=False)   # Namenswechsel in derselben Verbindung
         if p is None:
             p = self._add_player(nick)
             self.save()
             self.dashboard.log(f"Neuer Spieler: {nick}")
+        if p.match and not p.match.finished:await p.match.expire_connections()
         p.conn = conn
         p.tok = secrets.token_hex(12)
         # Keep reconnect credentials stable across reloads and server restarts.
@@ -971,7 +1029,8 @@ class Server:
         p.token_hash = hashlib.sha256(p.tok.encode()).hexdigest()
         self.save()
         await conn.send({"t": "nick_ok", "nick": p.nick, "tok": p.tok})
-        await conn.send(self.lobby_view(p))
+        if p.match and not p.match.finished:await p.match.resume_player(p)
+        else:await conn.send(self.lobby_view(p))
         await self.push_lobby()
         return p
 
@@ -1034,13 +1093,14 @@ class Server:
         await self._maybe_start(c)
         await self.push_lobby()
 
-    async def _on_disconnect(self, player):
+    async def _on_disconnect(self, player, reconnect=True):
         player.conn = None
         player.out_challenge = None
         for oc in self._withdraw(player):
             await self._maybe_start(oc)
         if player.match and not player.match.finished:
-            await player.match.abort(player)
+            if reconnect:await player.match.wait_for_player(player)
+            else:await player.match.abort(player)
         await self.push_lobby()
 
     # ----- Admin (laufen auf dem Loop-Thread via run_coroutine_threadsafe) -----

@@ -5,7 +5,7 @@
   function show(name) { screens.forEach(s => $(s).classList.toggle('active', s === name)); cur = name; }
   const canvas = $('c'), ctx = canvas.getContext('2d');
 
-  let ws, cur = 'login';
+  let ws, cur = 'login', retryTimer, reconnectAllowed=true, lastReceived=Date.now(), transportLost=false, recovering=false, pauseState=null;
   let me = { code: null, nick: null, credits: 0 };
   let gamesInfo = [];
   let selectedGame = null;
@@ -29,21 +29,33 @@
   };
 
   // ---------------- WebSocket ----------------
+  function connectionNotice(text) { if($('connectionNotice').textContent!==text)$('connectionNotice').textContent=text;$('connectionNotice').hidden=!text; }
+  function lost(socket) {
+    if(socket!==ws||!reconnectAllowed)return;
+    socket.onclose=null;socket.close();transportLost=true;recovering=true;connectionNotice('Verbindung unterbrochen · Wiederverbinden …');
+    clearTimeout(retryTimer);retryTimer=setTimeout(connect,1000);
+  }
   function connect() {
-    $('loginBtn').disabled = true;
-    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/');
-    ws.onopen = () => { $('loginBtn').disabled = false; };
-    ws.onmessage = (ev) => handle(JSON.parse(ev.data));
-    ws.onclose = () => { toast('Verbindung getrennt – lade neu…'); setTimeout(() => location.reload(), 1500); };
-    ws.onerror = () => {};
+    clearTimeout(retryTimer);$('loginBtn').disabled=true;
+    const socket=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/');ws=socket;lastReceived=Date.now();
+    socket.onopen=()=>{if(ws!==socket)return;$('loginBtn').disabled=false;};
+    socket.onmessage=event=>{if(ws!==socket)return;lastReceived=Date.now();handle(JSON.parse(event.data));};
+    socket.onclose=()=>lost(socket);socket.onerror=()=>{};
   }
   function sendMsg(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
-  // Keep quiet lobby connections alive through reverse proxies.
-  setInterval(() => sendMsg({ t: 'ping' }), 30000);
+  setInterval(()=>{if(ws&&ws.readyState===1){if(Date.now()-lastReceived>35000)lost(ws);else sendMsg({t:'ping'});}},10000);
+  setInterval(()=>{
+    if(transportLost)return;
+    if(pauseState?.paused){
+      const waiting=pauseState.waiting||[];
+      connectionNotice(waiting.length?'Warte auf '+waiting.map(p=>p.nick+' · '+Math.max(0,Math.ceil((p.until-performance.now())/1000))+' s').join(' / '):'Partie pausiert');
+    }else if(reconnectAllowed)connectionNotice('');
+  },200);
 
   function handle(m) {
     switch (m.t) {
-      case 'welcome': gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); tryAutoLogin(); break;
+      case 'pong': break;
+      case 'welcome': transportLost=false;connectionNotice('');gamesInfo = m.games; clientMode = m.mode || 'choose'; buildChips(); tryAutoLogin(); break;
       case 'login_ok':
         me.code = m.code;
         lsSet('cw_code', m.code);
@@ -55,14 +67,16 @@
         $('nickErr').textContent = '';
         if (!m.auto) { show('nick'); setTimeout(() => $('nickInput').focus(), 50); }
         break;
-      case 'login_err': $('loginErr').textContent = m.msg; lsDel('cw_code'); tabCode(null); show('login'); break;
-      case 'nick_err': $('nickErr').textContent = m.msg; lsDel('cw_tok'); show('nick'); break;
+      case 'login_err':pauseState=null;connectionNotice('');me.code=null;me.nick=null;me.tok=null;$('loginErr').textContent = m.msg; lsDel('cw_code'); tabCode(null); show('login'); break;
+      case 'nick_err':pauseState=null;connectionNotice('');me.nick=null;me.tok=null;$('nickErr').textContent = m.msg; lsDel('cw_tok'); show('nick'); break;
       case 'nick_ok':
-        me.nick = m.nick; lsSet('cw_nick', m.nick); lsSet('cw_tok', m.tok);
+        if(recovering){recovering=false;match=null;snap=null;pauseState=null;$('overlay').classList.remove('active');show('lobby');}
+        me.nick = m.nick; me.tok=m.tok; lsSet('cw_nick', m.nick); lsSet('cw_tok', m.tok);
         lsSet('cw_profile_' + me.code, JSON.stringify({nick:m.nick,tok:m.tok}));
         break;
       case 'session_ended':
-        lsDel('cw_code'); tabCode(null); me.code = null; me.nick = null;
+        reconnectAllowed=true;transportLost=false;pauseState=null;connectionNotice('');
+        lsDel('cw_code'); tabCode(null); me.code = null; me.nick = null;me.tok=null;
         $('loginErr').textContent = m.msg; show('login');
         break;
       case 'lobby': lobbyState = m; buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
@@ -70,12 +84,12 @@
       case 'match_start': startMatch(m); break;
       case 'state': snap = m.s; if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;
       case 'session_moved':lsSet('cw_profile_'+m.code,JSON.stringify({nick:me.nick,tok:lsGet('cw_tok')}));tabCode(m.code);location.reload();break;
-      case 'match_pause':toast(m.paused?'Partie pausiert':'Partie fortgesetzt');break;
-      case 'match_cancelled':match=null;snap=null;$('overlay').classList.remove('active');show('lobby');toast(m.msg);sendMsg({t:'lobby'});break;
+      case 'match_pause':pauseState={paused:m.paused,waiting:(m.waiting||[]).map(p=>({...p,until:performance.now()+p.seconds*1000}))};keyMask=touchMask=canvasMask=inputMask=0;break;
+      case 'match_cancelled':pauseState=null;connectionNotice('');match=null;snap=null;$('overlay').classList.remove('active');show('lobby');toast(m.msg);sendMsg({t:'lobby'});break;
       case 'match_end': endMatch(m); break;
       case 'info': toast(m.msg); break;
       case 'err': toast('⚠ ' + m.msg); break;
-      case 'kicked': toast(m.msg); break;
+      case 'kicked':reconnectAllowed=false;clearTimeout(retryTimer);pauseState=null;transportLost=false;connectionNotice('');$('loginErr').textContent=m.msg+' · Bitte Seite neu laden.';show('login');toast(m.msg);break;
     }
   }
 
@@ -90,8 +104,8 @@
   function tryAutoLogin() {
     const urlCode=new URLSearchParams(location.search).get('code');
     if(urlCode){$('codeInput').value=urlCode;tabCode(urlCode);history.replaceState(null,'','/');sendMsg({t:'login',code:urlCode});return;}
-    const c = tabCode(), profile = savedProfile(c);
-    const n = profile.nick || lsGet('cw_nick'), k = profile.tok || lsGet('cw_tok');
+    const c = me.code||tabCode(), profile = savedProfile(c);
+    const n = me.nick||profile.nick||lsGet('cw_nick'), k = me.tok||profile.tok||lsGet('cw_tok');
     if (c && n && k) sendMsg({ t: 'login', code: c, nick: n, tok: k });
   }
   $('loginBtn').onclick = () => {
@@ -107,7 +121,8 @@
   $('nickInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('nickBtn').click(); });
   $('switchSession').onclick = () => {
     if (cur === 'game' && !confirm('Sitzung wechseln und die laufende Partie verlassen?')) return;
-    ws.onclose = null; ws.close();
+    if(cur==='game')sendMsg({t:'leave'});
+    clearTimeout(retryTimer);reconnectAllowed=true;pauseState=null;transportLost=false;connectionNotice('');ws.onclose = null; ws.close();
     tabCode(null); lsDel('cw_code');
     me = {code:null,nick:null,credits:0}; match = null; snap = null;
     $('codeInput').value = ''; $('loginErr').textContent = '';
@@ -214,6 +229,7 @@
 
   // ---------------- Match ----------------
   function startMatch(m) {
+    pauseState=null;connectionNotice('');
     match = { gid: m.game, role: m.role, opp: m.opp };
     snap = null;
     for (const k in R) delete R[k];
@@ -228,10 +244,11 @@
     show('game');
   }
   function endMatch(m) {
+    pauseState=null;connectionNotice('');
     const big = $('resBig');
     big.className = 'big ' + m.result;
     big.textContent = m.result === 'win' ? 'GEWONNEN' : m.result === 'loss' ? 'VERLOREN' : 'UNENTSCHIEDEN';
-    const reasons = { normal: '', opp_left: 'Gegner hat aufgegeben', you_left: 'Aufgegeben = verloren' };
+    const reasons = { opp_disconnected:'Gegner nicht rechtzeitig zurückgekehrt',you_disconnected:'Wiederverbindungsfrist abgelaufen',normal: '', opp_left: 'Gegner hat aufgegeben', you_left: 'Aufgegeben = verloren' };
     $('resReason').textContent = (m.delta!==undefined ? (m.delta>0?'+':'')+m.delta+' Credits' : 'Credits aktualisiert') +
       (reasons[m.reason] ? ' · ' + reasons[m.reason] : '');
     me.credits = m.credits;

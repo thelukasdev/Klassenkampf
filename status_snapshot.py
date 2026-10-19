@@ -15,7 +15,7 @@ def snapshot(server):
             if row['active']:
                 state='standby'
                 if room and room.rules['paused']:state='paused'
-                elif room and room.matches:state='operational'
+                elif room and room.matches:state='paused' if all(m.is_paused for m in room.matches.values()) else 'operational'
                 if room and room.worker:
                     worker=room.worker
                     recent=time.time()-getattr(worker,'last_error_at',0)<300

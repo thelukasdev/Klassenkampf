@@ -66,6 +66,9 @@ class RemoteGame:
     def set_input(self,p,mask):
         # Accumulate edges while bounding messages from a noisy client.
         if len(self.commands)<256:self.commands.append(['input',p,mask])
+    def reset_inputs(self):
+        self.commands=[cmd for cmd in self.commands if cmd[0] not in ('input','reset')]
+        self.commands.append(['reset'])
     def remove_player(self,p): self.commands.append(['remove',p])
     async def step(self,speed=1):
         if not self.ready:

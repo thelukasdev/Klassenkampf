@@ -67,6 +67,9 @@ class Game:
         st["mask"] = mask
         st["edge"] |= edges
 
+    def reset_inputs(self):
+        for st in self.inp.values():st["mask"]=st["edge"]=0
+
     def _clear_edges(self):
         for st in self.inp.values():
             st["edge"] = 0

@@ -42,6 +42,8 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             listener.close()
             await listener.wait_closed()
         await asyncio.sleep(0.05)
+        for arena in [self.app]+(list(self.app.session_hub.rooms.values()) if self.app.session_hub else []):
+            for match in list(arena.matches.values()):await arena.control.cancel_match(match)
         await self.app.replays.drain()
         self.tmp.cleanup()
 

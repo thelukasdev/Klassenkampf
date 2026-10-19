@@ -137,7 +137,7 @@ class GameSessions:
             old=getattr(conn,'arena',None)
             if old and old is not room:
                 if player and player.conn is conn:
-                    await old._on_disconnect(player)
+                    await old._on_disconnect(player,reconnect=False)
                 old.joined_connections.discard(conn)
                 player=None
             conn.arena=room
@@ -189,4 +189,4 @@ class GameSessions:
                 'matches_detail':[{'id':m.id,'game':m.gid,'name':m.name,'players':[p.nick for p in m.active],
                                    'recording':bool(m.recorder and not m.recorder.closed),'replay_partial':bool(m.recorder and m.recorder.truncated),
                                    'spectators_allowed':not m.game.per_view,'watch_url':'/watch#'+m.spectator_token if m.spectator_token else None,
-                                   'paused':m.paused or room.rules['paused'],'duration':int(time.monotonic()-m.start_t)} for m in room.matches.values()] if room else []}
+                                   'paused':m.is_paused,'manual_paused':m.paused,'waiting':[p.nick for p in m.disconnected],'duration':int(time.monotonic()-m.start_t)} for m in room.matches.values()] if room else []}

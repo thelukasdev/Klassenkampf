@@ -12,7 +12,7 @@ class ArenaControl:
         if m.finished:return
         m.finished=True;m.end_reason=reason
         for p in m.active:
-            await m._send(p,{'t':'match_cancelled','msg':'Partie durch Spielleitung beendet.' if reason=='admin' else 'Partie wegen eines technischen Fehlers beendet.'})
+            await m._send(p,{'t':'match_cancelled','msg':'Partie durch Spielleitung beendet.' if reason=='admin' else 'Partie ohne Wertung beendet: Alle Spieler haben die Verbindung verloren.' if reason=='connection_lost' else 'Partie wegen eines technischen Fehlers beendet.'})
         self.room.close_match(m)
         if m.task and m.task is not asyncio.current_task():
             m.task.cancel(); await asyncio.gather(m.task,return_exceptions=True)
@@ -40,14 +40,14 @@ class ArenaControl:
             r.rules=proposed
             for p in r.players.values():p.out_challenge=None
             for m in r.matches.values():
-                for p in m.active:await m._send(p,{'t':'match_pause','paused':m.paused or r.rules['paused']})
+                await m.pause_notice()
             r.save();await r.push_lobby();return 'Spielregeln gespeichert.'
         if action in ('pause-match','end-match'):
             m=r.matches.get(int(value))
             if not m:raise ValueError('Partie nicht gefunden')
             if action=='end-match':await self.cancel_match(m);return 'Partie ohne Wertung beendet.'
             m.paused=not m.paused
-            for p in m.active:await m._send(p,{'t':'match_pause','paused':m.paused or r.rules['paused']})
+            await m.pause_notice()
             return 'Partie pausiert.' if m.paused else 'Partie fortgesetzt.'
         key=value.lower().strip();p=r.players.get(key)
         if not p:raise ValueError('Spieler nicht gefunden')
