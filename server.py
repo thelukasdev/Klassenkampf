@@ -1209,9 +1209,12 @@ class Server:
         stop = asyncio.Event()
         installed = []
         async def replay_maintenance():
+            from retention import cleanup
             while not stop.is_set():
+                try:await asyncio.to_thread(cleanup,self)
+                except Exception:logging.exception('Scheduled retention failed')
                 try:await asyncio.wait_for(stop.wait(),3600)
-                except asyncio.TimeoutError:await asyncio.to_thread(self.replays.cleanup)
+                except asyncio.TimeoutError:pass
         async def host_maintenance():
             while not stop.is_set():
                 if self.session_hub:

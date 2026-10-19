@@ -16,7 +16,12 @@ class Reports:
         with self.store.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS issue_reports(
                 id INTEGER PRIMARY KEY,reference TEXT UNIQUE NOT NULL,created INTEGER NOT NULL,
-                page TEXT NOT NULL,description TEXT NOT NULL,resolved INTEGER NOT NULL DEFAULT 0)''')
+                page TEXT NOT NULL,description TEXT NOT NULL,resolved INTEGER NOT NULL DEFAULT 0,resolved_at INTEGER)''')
+
+            if 'resolved_at' not in {r['name'] for r in db.execute('PRAGMA table_info(issue_reports)')}:
+                db.execute('ALTER TABLE issue_reports ADD COLUMN resolved_at INTEGER')
+            # Existing completed reports start their 30-day window at migration.
+            db.execute('UPDATE issue_reports SET resolved_at=? WHERE resolved=1 AND resolved_at IS NULL',(int(time.time()),))
 
     def session(self,headers):
         player=self.web.player_auth.session(headers)
@@ -62,7 +67,7 @@ class Reports:
         search=str(query.get('q',[''])[0]).strip().upper();state=query.get('state',['open'])[0]
         before=int(query.get('before',['0'])[0])
         if len(search)>40 or before<0 or state not in ('open','resolved','all'):raise ValueError('Ungültiger Filter.')
-        sql='SELECT * FROM issue_reports WHERE instr(reference,?)>0';params=[search]
+        sql='SELECT id,reference,created,page,description,resolved FROM issue_reports WHERE instr(reference,?)>0';params=[search]
         if state!='all':sql+=' AND resolved=?';params.append(int(state=='resolved'))
         if before:sql+=' AND id<?';params.append(before)
         with self.store.connect() as db:rows=[dict(r) for r in db.execute(sql+' ORDER BY id DESC LIMIT 26',params)]
@@ -74,6 +79,6 @@ class Reports:
         if type(resolved) is not bool:raise ValueError('Ungültiger Status.')
         with self.store.connect() as db:
             if not db.execute('SELECT 1 FROM issue_reports WHERE reference=?',(reference,)).fetchone():raise ValueError('Meldung nicht gefunden.')
-            db.execute('UPDATE issue_reports SET resolved=? WHERE reference=?',(int(resolved),reference))
+            db.execute('UPDATE issue_reports SET resolved=?,resolved_at=CASE WHEN ?=0 THEN NULL WHEN resolved=0 THEN ? ELSE resolved_at END WHERE reference=?',(int(resolved),int(resolved),int(time.time()),reference))
             db.execute('INSERT INTO audit(time,email,action,detail) VALUES(?,?,?,?)',
                        (int(time.time()),actor['email'],'resolve-report',reference+' '+str(resolved)))

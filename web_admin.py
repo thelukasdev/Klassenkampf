@@ -181,11 +181,16 @@ class WebAdmin:
         for row in rows[:25]:row['permissions']=self.player_auth.permissions.get(row['email'])
         return {'accounts':rows[:25],'next':rows[24]['email'] if len(rows)>25 else None}
 
-    async def manage_player(self,actor,action,value):
-        if actor['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Spielerkonten verwalten.')
+    async def manage_player(self,actor,action,value,*,self_delete=None):
+        if self_delete is None and actor['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Spielerkonten verwalten.')
         email=self.store.email(value);identity='player:'+email;hub=self.server.session_hub;rooms=[]
         with self.store.connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            if self_delete is not None:
+                expected_hash,token_hash=self_delete
+                current=db.execute('SELECT hash FROM player_accounts WHERE email=?',(email,)).fetchone()
+                active=db.execute('SELECT 1 FROM sessions WHERE token=? AND email=? AND expires>?',(token_hash,identity,int(time.time()))).fetchone()
+                if actor['email']!=identity or action!='delete-player-account' or not current or current['hash']!=expected_hash or not active:raise Denied('Bitte erneut anmelden.')
             if not db.execute('SELECT 1 FROM player_accounts WHERE email=?',(email,)).fetchone():raise ValueError('Spielerkonto nicht gefunden.')
             if action=='delete-player-account':
                 if hub:
@@ -194,6 +199,7 @@ class WebAdmin:
                         WHERE r.active=1 AND (a.email=? OR h.email=?)""",(identity,identity))]
                     # Persist closure before waiting for connections/workers to stop.
                     for rid in rooms:db.execute('UPDATE game_rooms SET active=0,ended=? WHERE id=?',(int(time.time()),rid))
+                    db.execute('DELETE FROM replay_shares WHERE replay_id IN (SELECT p.id FROM replays p WHERE p.room_id IN (SELECT room_id FROM session_access WHERE email=? UNION SELECT room_id FROM host_rooms WHERE email=?))',(identity,identity))
                     db.execute('DELETE FROM host_rooms WHERE email=?',(identity,))
                 db.execute('DELETE FROM player_permissions WHERE email=?',(email,))
                 db.execute('DELETE FROM player_accounts WHERE email=?',(email,))

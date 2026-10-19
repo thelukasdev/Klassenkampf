@@ -360,3 +360,38 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
             response=await self.http('/auth/player/csrf')
             self.assertTrue(self.body(response)['ready']);self.assertFalse(self.body(response)['mail_ready'])
             self.assertIn(b'503',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':data['email']}))
+
+    async def test_self_delete_password_confirmation_csrf_and_same_email_admin_survives(self):
+        h,token,*_=await self.signup();w=self.app.web_admin;admin_token=w.store.new_session('owner@example.org')
+        obj={'current_password':'test-player-password-123','confirmation':'LÖSCHEN'}
+        endpoint='/auth/player/delete-account'
+        self.assertIn(b'403',await self.http(endpoint,method='POST',data=obj))
+        self.assertIn(b'403',await self.http(endpoint,method='POST',data=obj,extra_headers={**h,'X-CSRF-Token':'wrong'}))
+        self.assertIn(b'400',await self.http(endpoint,method='POST',data={**obj,'confirmation':''},extra_headers=h))
+        self.assertIn(b'400',await self.http(endpoint,method='POST',data={**obj,'current_password':'wrong'},extra_headers=h))
+        room=self.body(await self.http('/api/player/action',method='POST',data={'action':'create-session','value':'My room'},extra_headers=h))['result']
+        with w.store.connect() as db:
+            db.execute('INSERT INTO replays VALUES(?,?,?,?,?,?,?,0,0,?,0,0,?)',('f'*32,room['id'],'pong','Test','["A","B"]',int(__import__('time').time()),int(__import__('time').time()),'[]','normal'))
+        share=self.app.replays.share(room['id'],'f'*32)
+        other=w.store.new_session('player:owner@example.org')
+        response=await self.http(endpoint,method='POST',data={**obj,'email':'another@example.org'},extra_headers=h)
+        self.assertIn(b'200',response);self.assertIn(b'Max-Age=0',response)
+        self.assertIsNone(w.store.session(token));self.assertIsNone(w.store.session(other));self.assertIsNotNone(w.store.session(admin_token))
+        self.assertNotIn(room['id'],self.hub.rooms)
+        with self.assertRaises(ValueError):self.app.replays.shared(share)
+        with w.store.connect() as db:
+            self.assertIsNone(db.execute("SELECT 1 FROM player_accounts WHERE email='owner@example.org'").fetchone())
+            self.assertIsNone(db.execute("SELECT 1 FROM session_access WHERE email='player:owner@example.org'").fetchone())
+            self.assertEqual(db.execute('SELECT active FROM game_rooms WHERE id=?',(room['id'],)).fetchone()[0],0)
+        self.assertIn(b'403',await self.http(endpoint,method='POST',data=obj,extra_headers=h))
+
+    async def test_self_delete_rechecks_session_after_password_verification(self):
+        h,token,*_=await self.signup()
+        original=self.app.web_admin.password_auth.verify
+        def revoke(password,encoded):
+            with self.auth.store.connect() as db:db.execute('DELETE FROM sessions WHERE token=?',(self.auth.store.digest(token),))
+            return original(password,encoded)
+        with patch('player_auth.PasswordAuth.verify',side_effect=revoke):
+            response=await self.http('/auth/player/delete-account',method='POST',data={'current_password':'test-player-password-123','confirmation':'LÖSCHEN'},extra_headers=h)
+        self.assertIn(b'403',response)
+        with self.auth.store.connect() as db:self.assertIsNotNone(db.execute("SELECT 1 FROM player_accounts WHERE email='owner@example.org'").fetchone())

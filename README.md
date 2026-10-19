@@ -12,7 +12,7 @@ Browser-Minispiele mit parallelen Spielsitzungen, Webverwaltung und öffentliche
 - Pro Spielerkonto schaltbare Zusatzrechte, eigene erweiterte Verwaltung und einstellbare Sitzungslimits.
 - Zuschauerfreigaben und Replays für die Spielleitung.
 - Einladungslinks und QR-Codes, Passwortänderung im Konto und Fehlermeldungen für angemeldete Nutzer mit Referenznummer und Verwaltungsansicht.
-- Separate Statusüberwachung mit dauerhaftem Verlauf und Anzeige der letzten sechs Ereignisse.
+- Separate Statusüberwachung mit 90 Tagen Verlauf und Anzeige der letzten sechs Ereignisse.
 - Unterprozess je spielender Sitzung, getrennte Spielzustände je Partie.
 
 ## Installation
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 79 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 84 Tests geprüft.
 
 ## Anleitungen
 
@@ -87,3 +87,5 @@ Enthalten sind Quellcode, statische Assets, Tests und allgemeine Deployment-Date
 
 ## Impressum und Datenschutz
 Die öffentlichen Seiten `/impressum` und `/datenschutz` benötigen eine private, vollständige Betreiberkonfiguration in `/data/legal.json`. Vorlagen und Anleitung: [RECHTLICHE-SEITEN.md](RECHTLICHE-SEITEN.md). Persönliche Betreiberangaben sind nicht im Repository enthalten. Vor öffentlichem Betrieb eigene Angaben, Vertragsgrundlagen und tatsächliche Datenverarbeitung prüfen und die Konfiguration einrichten.
+
+Kontolöschung und automatische Löschfristen: siehe [DATENLOESCHUNG.md](DATENLOESCHUNG.md).

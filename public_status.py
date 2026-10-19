@@ -52,6 +52,7 @@ class StatusStore:
     @staticmethod
     def accrue(db,component,start,end,state):
         if state=='ended':return
+        start=max(start,(end//86400-89)*86400)
         while start<end:
             day=time.strftime('%Y-%m-%d',time.gmtime(start))
             boundary=(start//86400+1)*86400
@@ -91,6 +92,21 @@ class StatusStore:
                 db.execute('INSERT INTO components VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,state=excluded.state,since=excluded.since,checked=excluded.checked,data=excluded.data',
                            (cid,item['label'],item['kind'],state,since,now,json.dumps(safe)))
             db.execute("INSERT OR REPLACE INTO meta VALUES('checked',?)",(str(now),))
+        self.cleanup(now)
+
+    def cleanup(self,now=None):
+        now=int(time.time()) if now is None else int(now)
+        with self.connect() as db:
+            previous=db.execute("SELECT value FROM meta WHERE key='cleanup'").fetchone()
+            if previous and now-int(previous[0])<3600:return
+            rows=db.execute("SELECT id FROM components WHERE kind='session' AND state='ended' AND since<=?",(now-30*86400,)).fetchall()
+            for row in rows:
+                db.execute('DELETE FROM events WHERE component=?',(row['id'],))
+                db.execute('DELETE FROM daily WHERE component=?',(row['id'],))
+                db.execute('DELETE FROM components WHERE id=?',(row['id'],))
+            db.execute('DELETE FROM events WHERE time<=?',(now-90*86400,))
+            db.execute('DELETE FROM daily WHERE day<?',(time.strftime('%Y-%m-%d',time.gmtime(now-89*86400)),))
+            db.execute("INSERT OR REPLACE INTO meta VALUES('cleanup',?)",(str(now),))
 
     def previous_sessions(self):
         with self.connect() as db:

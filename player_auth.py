@@ -165,11 +165,25 @@ class PlayerAuth:
             db.execute('DELETE FROM player_resets WHERE email=?',(email,))
         self.store.log(session['email'],'player-password-change')
 
+    async def delete_account(self,headers,obj):
+        session=self.session(headers)
+        if not session:raise Denied('Bitte erneut anmelden.')
+        password=obj.get('current_password','')
+        if obj.get('confirmation')!='LÖSCHEN' or not isinstance(password,str) or not 1<=len(password)<=256:raise ValueError('Bitte Passwort und Löschbestätigung eingeben.')
+        self.hit('delete-account:'+session['email'],5,900)
+        email=session['display_email']
+        with self.store.connect() as db:account=db.execute('SELECT hash FROM player_accounts WHERE email=?',(email,)).fetchone()
+        if not account:raise Denied('Bitte erneut anmelden.')
+        if self.slots.locked():raise ValueError('Bitte später erneut versuchen.')
+        async with self.slots:valid=await asyncio.to_thread(PasswordAuth.verify,password,account['hash'])
+        if not valid:raise ValueError('Aktuelles Passwort ist falsch.')
+        await self.web.manage_player(session,'delete-player-account',email,self_delete=(account['hash'],self.store.digest(self.web.cookie(headers,self.COOKIE))))
+
     async def handle(self,reader,writer,method,route,headers):
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
             token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready},cookie=(self.CSRF,token,600));return
-        if route=='/auth/player/change-password' and method=='POST':
+        if route in ('/auth/player/change-password','/auth/player/delete-account') and method=='POST':
             session=self.session(headers)
             if not session or headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Bitte erneut anmelden.')
             if headers.get('transfer-encoding') or headers.get('content-type','').split(';')[0]!='application/json':raise ValueError('JSON erforderlich.')
@@ -177,7 +191,8 @@ class PlayerAuth:
             if not 0<length<=4096:raise ValueError('Anfrage zu groß.')
             obj=json.loads(await asyncio.wait_for(reader.readexactly(length),5))
             if not isinstance(obj,dict):raise ValueError('Ungültige Anfrage.')
-            await self.change_password(headers,obj)
+            if route.endswith('/delete-account'):await self.delete_account(headers,obj)
+            else:await self.change_password(headers,obj)
             await w.respond(writer,200,{'ok':True},cookie=(self.COOKIE,'',0));return
         if route=='/auth/player/logout' and method=='POST':
             session=self.session(headers)
