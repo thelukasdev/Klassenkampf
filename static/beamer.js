@@ -12,5 +12,6 @@
  }catch(e){if(stopped&&e.name==='AbortError')return;clear();$('beamerStatus').textContent=e.message==='Failed to fetch'?'Verbindung unterbrochen.':e.message;}if(!stopped)timer=setTimeout(refresh,delay);}
  $('beamerFullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{$('beamerStatus').textContent='Vollbild ist in diesem Browser nicht verfügbar.';}};
  document.addEventListener('fullscreenchange',()=>{$('beamerFullscreen').textContent=document.fullscreenElement?'Vollbild beenden':'Vollbild';$('beamerFullscreen').setAttribute('aria-pressed',String(!!document.fullscreenElement));});
+ window.addEventListener('hashchange',()=>{stopped=true;clearTimeout(timer);controller.abort();clear();location.reload();});
  window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);controller.abort();clear();});window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});refresh();
 })();
