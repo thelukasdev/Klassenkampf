@@ -18,6 +18,7 @@ class ArenaControl:
             m.task.cancel(); await asyncio.gather(m.task,return_exceptions=True)
     async def action(self,obj):
         r=self.room; action=obj['action']; value=str(obj.get('value',''))
+        if action=='projector':return r.projector.select(value)
         if action=='release-waiting-room':
             result=r.flow.release();await r.push_lobby();return result
         if action=='spectators':

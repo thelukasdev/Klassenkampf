@@ -72,7 +72,7 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 105 Tests geprüft.
+Tests verwenden temporäre Daten und simulierten Mailversand. Sie prüfen unter anderem WebSockets, Rechte, 2FA, E-Mail-Codes, Passwortreset, Kontenlöschung, Sitzungsisolation, Unterprozesse, Replays und Statusverläufe. Der Stand wurde unter Python 3.12 auf Windows und im Linux-Container mit 112 Tests geprüft.
 
 ## Anleitungen
 
@@ -99,3 +99,5 @@ Raumadressen ohne Beitrittscode und weiterhin direkte Einladungen: [RAUMADRESSEN
 Revanche, Viererabstimmung und optionaler Warteraum: [RUNDENABLAUF.md](RUNDENABLAUF.md).
 
 Private Support-Tickets mit Admin-Antworten, E-Mail-Link und Spieler-Verlauf: [TICKETS.md](TICKETS.md).
+
+Beamer-Ansicht mit Live-Partie-Auswahl, Rangliste und widerrufbarer Freigabe: [BEAMER.md](BEAMER.md).

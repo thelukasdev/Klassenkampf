@@ -309,6 +309,7 @@ class WebAdmin:
                     if not policy['manage_saves']:overview['saves']=[]
                     if not policy['view_results']:overview['history']=[]
                     if not policy['view_replays']:overview['replays']=[]
+                    if not (policy['manage_games'] and policy['view_results']):overview['projector']={}
                     if not policy['manage_games']:
                         overview['matches_detail']=[];overview['rules']={};overview['server']={}
                     audit=[]
@@ -391,7 +392,7 @@ class WebAdmin:
                         db.execute('DELETE FROM admin_passwords WHERE email=?',(email,))
                 result='Zugriff aktualisiert'
             elif action in ('kick','ban','unban','reset-credits','mode','save','load','create-session','end-session',
-                            'rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room'):
+                            'rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room','projector'):
                 if self.server.session_hub:
                     if action=='create-session':
                         if session['role']=='host':

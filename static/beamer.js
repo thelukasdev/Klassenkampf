@@ -1,0 +1,16 @@
+(() => {
+ 'use strict';const $=id=>document.getElementById(id),token=location.hash.slice(1),renderer=createPassiveRenderer($('beamerCanvas'));let stopped=false,timer=null,source='',lastRanking='';const controller=new AbortController();
+ function text(tag,value){const e=document.createElement(tag);e.textContent=value;return e;}
+ function clear(){renderer.clear();source='';lastRanking='';$('beamerGame').hidden=true;$('beamerRanking').hidden=true;$('beamerPlayers').replaceChildren();delete $('beamerPlayers').dataset.names;$('beamerRows').replaceChildren();$('beamerSession').textContent='Beamer';}
+ async function refresh(){let delay=1000;try{
+  if(!/^[A-Za-z0-9_-]{64}$/.test(token)){stopped=true;throw Error('Kein gültiger Beamer-Link.');}
+  const r=await fetch('/api/beamer',{headers:{'X-Projector-Token':token},credentials:'omit',cache:'no-store',signal:controller.signal});if(!r.ok){if(r.status===404){stopped=true;throw Error('Übertragung beendet oder nicht verfügbar.');}throw Error('Verbindung unterbrochen.');}
+  const d=await r.json();if(stopped)return;delay=d.mode==='match'?200:1000;$('beamerSession').textContent=d.session;document.title=d.session+' · Beamer';const key=d.mode+':'+d.revision+':'+(d.game||'');if(key!==source){renderer.clear();source=key;}
+  $('beamerGame').hidden=d.mode!=='match';$('beamerRanking').hidden=d.mode!=='ranking';
+  if(d.mode==='match'){$('beamerGameName').textContent=d.name;const names=d.players.join(' / ');if($('beamerPlayers').dataset.names!==names){$('beamerPlayers').replaceChildren(...d.players.map(n=>text('span',n)));$('beamerPlayers').dataset.names=names;}$('beamerStatus').textContent=d.reconnecting.length?'Wiederverbindung: '+d.reconnecting.join(' / '):!d.frame?'Spielansicht wird vorbereitet …':d.state==='paused'?'Pausiert':'Live';if(d.frame)renderer.draw(d.game,d.frame);else renderer.clear();}
+  else{$('beamerStatus').textContent=d.state==='finished'?'Partie beendet':'';const signature=JSON.stringify(d.ranking);if(signature!==lastRanking){$('beamerRows').style.setProperty('--rank-rows',String(Math.max(1,Math.ceil(d.ranking.length/2))));$('beamerRows').replaceChildren(...d.ranking.map(p=>{const row=document.createElement('li');row.append(text('span',p.name),text('strong',String(p.credits)));return row;}));lastRanking=signature;}$('beamerEmpty').hidden=!!d.ranking.length;$('beamerStats').textContent=d.online+' online · '+d.matches+' laufende Partien';}
+ }catch(e){if(stopped&&e.name==='AbortError')return;clear();$('beamerStatus').textContent=e.message==='Failed to fetch'?'Verbindung unterbrochen.':e.message;}if(!stopped)timer=setTimeout(refresh,delay);}
+ $('beamerFullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{$('beamerStatus').textContent='Vollbild ist in diesem Browser nicht verfügbar.';}};
+ document.addEventListener('fullscreenchange',()=>{$('beamerFullscreen').textContent=document.fullscreenElement?'Vollbild beenden':'Vollbild';$('beamerFullscreen').setAttribute('aria-pressed',String(!!document.fullscreenElement));});
+ window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);controller.abort();clear();});window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});refresh();
+})();

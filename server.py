@@ -402,6 +402,8 @@ class Server:
         self.history=[]
         from round_flow import RoundFlow
         self.flow=RoundFlow(self)
+        from projector import Projector
+        self.projector=Projector(self)
         self.worker=None
         if room_id and os.environ.get('KLASSENKAMPF_WORKERS','1')=='1':
             from game_worker import SessionWorker
@@ -689,6 +691,11 @@ class Server:
                 await self.web_admin.respond(writer,200,{'result':result})
             except (ValueError,OSError):
                 await self.web_admin.respond(writer,404,{'error':'Replay nicht verfügbar oder Freigabe beendet.'})
+        elif urlsplit(path).path=='/api/beamer':
+            from projector import find
+            projection=find(self,headers.get('x-projector-token','')) if method=='GET' else None
+            data=projection.payload() if projection else None
+            await self.web_admin.respond(writer,200 if data else 404,data or {'error':'Übertragung beendet oder nicht verfügbar.'})
         elif urlsplit(path).path=='/api/watch':
             token=headers.get('x-spectator-token','')
             match=None
@@ -753,6 +760,7 @@ class Server:
         if path in ('/login','/login/'):
             path='/login.html'
         if path in ('/replay','/replay/'):path='/shared-replay.html'
+        if path in ('/beamer','/beamer/'):path='/beamer.html'
         if path in ('/watch','/watch/'):
             path='/watch.html'
         if path in ('/admin', '/admin/'):
@@ -854,7 +862,7 @@ class Server:
         if self.session_hub:
             return await self.session_hub.action(obj)
         action = obj['action']
-        if action in ('rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room'):
+        if action in ('rules','pause-match','end-match','remove-player','move-player','spectators','release-waiting-room','projector'):
             return await self.control.action(obj)
         value = str(obj.get('value', ''))
         if action == 'status':

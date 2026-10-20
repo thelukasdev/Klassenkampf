@@ -9,7 +9,7 @@ ACTIONS = {
     'kick': 'moderate_players', 'ban': 'moderate_players', 'unban': 'moderate_players',
     'reset-credits': 'moderate_players', 'remove-player': 'moderate_players',
     'move-player': 'moderate_players', 'mode': 'manage_games', 'rules': 'manage_games',
-    'pause-match': 'manage_games', 'end-match': 'manage_games', 'spectators': 'manage_games',
+    'pause-match': 'manage_games', 'end-match': 'manage_games', 'spectators': 'manage_games', 'projector': 'manage_games',
     'share-replay': 'view_replays', 'revoke-replay': 'view_replays',
     'save': 'manage_saves', 'load': 'manage_saves',
 }
@@ -52,4 +52,5 @@ class PlayerPermissions:
 
     @staticmethod
     def permits(policy, action):
+        if action=='projector':return bool(policy.get('manage_games') and policy.get('view_results'))
         return action in ('create-session', 'end-session','release-waiting-room') or bool(policy.get(ACTIONS.get(action, ''), False))

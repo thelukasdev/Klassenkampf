@@ -103,7 +103,7 @@ class GameSessions:
         if not room.room_active:
             raise ValueError('Diese Spielsitzung ist bereits beendet.')
         room.room_active=False
-        room.flow.cancel_all()
+        room.flow.cancel_all();room.projector.token=None
         with self.store.connect() as db:
             db.execute('UPDATE game_rooms SET active=0,ended=? WHERE id=?',(int(time.time()),room_id))
         # Administrative end is neutral: no invented wins or losses.
@@ -186,7 +186,7 @@ class GameSessions:
                           'matches':len(room.matches) if room else 0,'connections':len(room.joined_connections) if room else 0},
                 'code':room.login_code if room and room.room_active else None,
                 'saves':room.admin_list_saves() if room else [],
-                'flow':room.flow.summary() if room else {},'rules':room.rules if room else {},'history':room.history if room else [],
+                'projector':room.projector.overview() if room else {},'flow':room.flow.summary() if room else {},'rules':room.rules if room else {},'history':room.history if room else [],
                 'replays':self.server.replays.metadata(room.room_id) if room else [],
                 'matches_detail':[{'id':m.id,'game':m.gid,'name':m.name,'players':[p.nick for p in m.active],
                                    'recording':bool(m.recorder and not m.recorder.closed),'replay_partial':bool(m.recorder and m.recorder.truncated),
