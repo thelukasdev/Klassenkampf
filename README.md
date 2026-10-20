@@ -94,7 +94,7 @@ Automatische Wiederverbindung mit 30 Sekunden Partiepause: siehe [WIEDERVERBINDU
 
 Raumadressen ohne Beitrittscode und weiterhin direkte Einladungen: [RAUMADRESSEN.md](RAUMADRESSEN.md).
 
-Öffentliche Demos für Vier gewinnt und Tennis42 gegen lokale Bots: [DEMO.md](DEMO.md). Zusätzliche Bot-/Regeltests für die Entwicklung: `node --test tests/test_demo_engine.cjs tests/test_demo_tennis.cjs` (14 Tests). Der Produktivserver benötigt dafür kein Node.js.
+Öffentliche Demos für Vier gewinnt und Tennis42 gegen lokale Bots: [DEMO.md](DEMO.md). Zusätzliche Bot-/Regeltests für die Entwicklung: `node --test tests/test_demo_engine.cjs tests/test_demo_tennis.cjs` (18 Tests). Der Produktivserver benötigt dafür kein Node.js.
 
 Revanche, Viererabstimmung und optionaler Warteraum: [RUNDENABLAUF.md](RUNDENABLAUF.md).
 
