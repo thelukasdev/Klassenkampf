@@ -107,6 +107,7 @@
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
+  function avatarImg(id){const safe=['robot','fox','cat','bear','owl','ghost','rocket','bolt'].includes(id)?id:'robot';return '<img class="player-avatar" src="/avatars/'+safe+'.svg" width="32" height="32" alt="">';}
   function savedProfile(code) { try { return JSON.parse(lsGet('cw_profile_' + code) || '{}'); } catch { return {}; } }
   function tabCode(value) { try { if(value===null)sessionStorage.removeItem('cw_code');else if(value!==undefined)sessionStorage.setItem('cw_code',value);return sessionStorage.getItem('cw_code'); } catch { return null; } }
   function tabRoomPath(value){try{if(value===null)sessionStorage.removeItem('cw_room_path');else if(value!==undefined)sessionStorage.setItem('cw_room_path',value);return sessionStorage.getItem('cw_room_path');}catch(_){return null;}}
@@ -163,7 +164,7 @@
       const dot = p.busy ? 'busy' : (p.online ? 'online' : '');
       html += `<div class="rank-row${p.you ? ' me' : ''}">`
         + `<span class="rk${i === 0 ? ' top' : ''}">${i + 1}</span>`
-        + `<span class="nm"><span class="dot ${dot}"></span>${esc(p.nick || '—')}${p.you ? ' <span class="tag">(du)</span>' : ''}</span>`
+        + `<span class="nm"><span class="dot ${dot}"></span>${avatarImg(p.avatar)}${esc(p.nick || '—')}${p.you ? ' <span class="tag">(du)</span>' : ''}</span>`
         + `<span class="cr ${cls}">${p.credits >= 0 ? '+' : ''}${p.credits}</span>`
         + `<span class="sn">${p.wl[0]}/${p.wl[1]}</span></div>`;
     });
@@ -217,7 +218,7 @@
       row.className = 'prow' + (p.online ? ' on' : '') + (p.you ? ' me' : '');
       const st = p.busy ? 'busy' : (p.online ? 'online' : '');
       row.innerHTML = `<span class="dot ${st}"></span>
-        <span class="pn">${esc(p.nick || '—')}</span>
+        <span class="pn">${avatarImg(p.avatar)}${esc(p.nick || '—')}</span>
         <span class="pcred">${p.credits >= 0 ? '+' : ''}${p.credits}</span>`;
       if(waiting){const tag=document.createElement('span');tag.className='tag';tag.textContent=p.ready?'Bereit':'Noch nicht bereit';row.append(tag);}
       else if (!p.you) {

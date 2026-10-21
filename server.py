@@ -77,6 +77,7 @@ MIME = {
     ".js": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".png": "image/png",
+    ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
     ".json": "application/json",
 }
@@ -118,6 +119,7 @@ class Conn:
 class Player:
     def __init__(self, nick):
         self.nick = nick
+        self.avatar = "robot"
         self.pid = None           # oeffentliche ID
         self.tok = None           # geheimer Schluessel fuers Wiederverbinden
         self.token_hash = None
@@ -146,7 +148,7 @@ class Player:
 
     def to_dict(self):
         return {"credits": self.credits, "record": self.record,
-                "token_hash": self.token_hash}
+                "token_hash": self.token_hash,"avatar": self.avatar}
 
 
 def nick_key(nick):
@@ -483,6 +485,8 @@ class Server:
             p.credits = d.get("credits", 0)
             p.record = {k: list(v) for k, v in d.get("record", {}).items()}
             p.token_hash = d.get('token_hash')
+            from avatars import safe_avatar
+            p.avatar=safe_avatar(d.get('avatar'))
         self.banned = banned
         self.mode = data.get("mode", self.mode)
 
@@ -492,7 +496,7 @@ class Server:
         for p in sorted(self.players.values(), key=lambda x: x.key):
             players.append({
                 "pid": p.pid,
-                "nick": p.nick,
+                "nick": p.nick,"avatar":p.avatar,
                 "credits": p.credits,
                 "online": p.online,
                 "busy": p.busy,
@@ -911,6 +915,8 @@ class Server:
         await writer.drain()
 
         conn = Conn(writer)
+        account=self.web_admin.player_auth.session(headers)
+        conn.account_email=account["display_email"] if account else None
         player = None
         recent_messages = deque(maxlen=241)
         await conn.send({"t": "welcome", "games": games.GAME_INFO, "mode": self.mode})
@@ -1080,6 +1086,7 @@ class Server:
             self.dashboard.log(f"Neuer Spieler: {nick}")
         if p.match and not p.match.finished:await p.match.expire_connections()
         p.conn = conn
+        p.avatar=self.web_admin.player_auth.avatar(conn.account_email) if getattr(conn,"account_email",None) else "robot"
         p.tok = secrets.token_hex(12)
         # Keep reconnect credentials stable across reloads and server restarts.
         if p.token_hash:

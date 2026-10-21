@@ -204,6 +204,7 @@ class WebAdmin:
                 db.execute('DELETE FROM player_permissions WHERE email=?',(email,))
                 db.execute('DELETE FROM report_messages WHERE report_id IN (SELECT id FROM issue_reports WHERE owner=?)',(identity,))
                 db.execute('DELETE FROM issue_reports WHERE owner=?',(identity,))
+                db.execute('DELETE FROM player_avatars WHERE email=?',(email,))
                 db.execute('DELETE FROM player_accounts WHERE email=?',(email,))
                 db.execute("DELETE FROM admins WHERE email=? AND role='host'",(identity,))
                 db.execute('DELETE FROM session_access WHERE email=?',(identity,))
@@ -211,6 +212,7 @@ class WebAdmin:
             db.execute('DELETE FROM player_codes WHERE email=?',(email,))
             db.execute('DELETE FROM player_resets WHERE email=?',(email,))
             db.execute('INSERT INTO audit(time,email,action,detail) VALUES(?,?,?,?)',(int(time.time()),actor['email'],action,email))
+        if action=='delete-player-account':await self.player_auth.refresh_avatars(email)
         for rid in rooms:
             room=hub.rooms.get(rid)
             if room and room.room_active:await hub.end(rid)

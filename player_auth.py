@@ -30,8 +30,26 @@ class PlayerAuth:
                     password TEXT,expires INTEGER NOT NULL,attempts INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS player_resets(token TEXT PRIMARY KEY,email TEXT NOT NULL,hash TEXT NOT NULL,
                     expires INTEGER NOT NULL,attempts INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS player_avatars(email TEXT PRIMARY KEY,avatar TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS player_limits(key TEXT PRIMARY KEY,started INTEGER NOT NULL,count INTEGER NOT NULL);
             ''')
+
+    def avatar(self,email):
+        from avatars import safe_avatar
+        with self.store.connect() as db:
+            row=db.execute('SELECT a.avatar FROM player_accounts p LEFT JOIN player_avatars a ON a.email=p.email WHERE p.email=?',(email,)).fetchone()
+        return safe_avatar(row['avatar'] if row else None)
+
+    async def refresh_avatars(self,email):
+        avatar=self.avatar(email)
+        rooms=[self.web.server]
+        if self.web.server.session_hub:rooms+=list(self.web.server.session_hub.rooms.values())
+        for room in rooms:
+            changed=False
+            for p in room.players.values():
+                if p.conn and getattr(p.conn,'account_email',None)==email:
+                    p.avatar=avatar;changed=True
+            if changed:room.save();await room.push_lobby()
 
     @property
     def ready(self):return all(os.environ.get(k) for k in ('SMTP_HOST','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'))
@@ -183,6 +201,28 @@ class PlayerAuth:
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
             token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready},cookie=(self.CSRF,token,600));return
+        if route=='/auth/player/avatar':
+            from avatars import AVATARS
+            session=self.session(headers)
+            if not session:raise Denied('Bitte erneut anmelden.')
+            email=session['display_email']
+            if method=='GET':
+                await w.respond(writer,200,{'avatar':self.avatar(email),'choices':AVATARS});return
+            if method!='POST':
+                await w.respond(writer,405,{'error':'Methode nicht erlaubt.'});return
+            if headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Ungültige Sicherheitsprüfung.')
+            if headers.get('transfer-encoding') or headers.get('content-type','').split(';')[0]!='application/json':raise ValueError('JSON erforderlich.')
+            length=int(headers.get('content-length','0'))
+            if not 0<length<=512:raise ValueError('Anfrage zu groß.')
+            obj=json.loads(await asyncio.wait_for(reader.readexactly(length),5))
+            avatar=obj.get('avatar') if isinstance(obj,dict) else None
+            if not isinstance(avatar,str) or avatar not in AVATARS:raise ValueError('Ungültiger Avatar.')
+            self.hit('avatar:'+email,60,900)
+            with self.store.connect() as db:
+                if not db.execute('SELECT 1 FROM player_accounts WHERE email=?',(email,)).fetchone():raise Denied('Bitte erneut anmelden.')
+                db.execute('INSERT OR REPLACE INTO player_avatars VALUES(?,?)',(email,avatar))
+            await self.refresh_avatars(email)
+            await w.respond(writer,200,{'ok':True,'avatar':avatar});return
         if route in ('/auth/player/change-password','/auth/player/delete-account') and method=='POST':
             session=self.session(headers)
             if not session or headers.get('origin')!=w.origin or not secrets.compare_digest(headers.get('x-csrf-token','').encode(),session['csrf'].encode()):raise Denied('Bitte erneut anmelden.')
