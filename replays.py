@@ -24,6 +24,8 @@ class ReplayLibrary:
                 ended INTEGER,duration REAL NOT NULL,frames INTEGER NOT NULL,segments TEXT NOT NULL,
                 bytes INTEGER NOT NULL,truncated INTEGER NOT NULL,reason TEXT NOT NULL)''')
             db.execute('CREATE TABLE IF NOT EXISTS replay_shares(replay_id TEXT PRIMARY KEY,token_hash TEXT UNIQUE NOT NULL)')
+            db.execute('CREATE INDEX IF NOT EXISTS replays_room_started ON replays(room_id,started DESC) WHERE ended IS NOT NULL')
+            db.execute('CREATE INDEX IF NOT EXISTS replays_ended ON replays(ended) WHERE ended IS NOT NULL')
             db.execute("UPDATE replays SET ended=?,truncated=1,reason='interrupted' WHERE ended IS NULL",(int(time.time()),))
         self.cleanup()
 

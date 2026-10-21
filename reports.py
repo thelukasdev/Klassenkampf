@@ -35,6 +35,8 @@ class Reports:
                 UNIQUE(report_id,author,request_id))''')
             db.execute('CREATE INDEX IF NOT EXISTS issue_reports_owner ON issue_reports(owner,id)')
             db.execute('CREATE INDEX IF NOT EXISTS report_messages_ticket ON report_messages(report_id,id)')
+            db.execute('CREATE INDEX IF NOT EXISTS issue_reports_activity ON issue_reports(COALESCE(last_activity,created) DESC,id DESC)')
+            db.execute('CREATE INDEX IF NOT EXISTS issue_reports_state_activity ON issue_reports(resolved,COALESCE(last_activity,created) DESC,id DESC)')
             # Existing completed reports start their 30-day window at migration.
             db.execute('UPDATE issue_reports SET resolved_at=? WHERE resolved=1 AND resolved_at IS NULL',(int(time.time()),))
 

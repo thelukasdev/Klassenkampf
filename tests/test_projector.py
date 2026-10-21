@@ -16,6 +16,16 @@ class ProjectorTests(unittest.IsolatedAsyncioTestCase):
     async def public(self,token,**kwargs):
         return await self.http('/api/beamer',extra_headers={'X-Projector-Token':token},**kwargs)
 
+    async def test_replay_and_ticket_indexes_avoid_list_sorting(self):
+        with self.app.web_admin.store.connect() as db:
+            queries=[
+                ("SELECT id FROM replays WHERE room_id=? AND ended IS NOT NULL AND ended>=? ORDER BY started DESC LIMIT 100",('room',0),'replays_room_started'),
+                ("SELECT id FROM issue_reports WHERE resolved=? ORDER BY COALESCE(last_activity,created) DESC,id DESC LIMIT 26",(0,),'issue_reports_state_activity'),
+                ("SELECT id FROM issue_reports ORDER BY COALESCE(last_activity,created) DESC,id DESC LIMIT 26",(),'issue_reports_activity')]
+            for query,args,index in queries:
+                plan=' '.join(row[3] for row in db.execute('EXPLAIN QUERY PLAN '+query,args))
+                self.assertIn(index,plan);self.assertNotIn('TEMP B-TREE',plan)
+
     async def test_explicit_release_header_only_and_public_view_allowlist(self):
         m=await self.match()
         self.assertIn(b'404',await self.public(''))
