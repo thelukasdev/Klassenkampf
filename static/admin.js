@@ -162,6 +162,7 @@
     event.preventDefault();$('loginSubmit').disabled=true;$('loginError').hidden=true;
     try{
       const response=await fetch('/auth/password/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':loginCsrf},body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});
+      if(response.status===429)throw Error('Zu viele Anfragen aus deinem Netzwerk. Bitte kurz warten und erneut versuchen.');
       const result=await response.json();if(!response.ok)throw Error(result.error||'Anmeldung fehlgeschlagen.');$('loginPassword').value='';showMfa(result);
     }catch(error){$('loginError').textContent=error.message;$('loginError').hidden=false;$('loginSubmit').disabled=false;}
   });
@@ -178,6 +179,7 @@
     event.preventDefault();$('mfaSubmit').disabled=true;$('loginError').hidden=true;
     try{
       const response=await fetch('/auth/password/mfa',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':loginCsrf},body:JSON.stringify({code:$('mfaCode').value})});
+      if(response.status===429)throw Error('Zu viele Anfragen aus deinem Netzwerk. Bitte kurz warten und erneut versuchen.');
       const result=await response.json();if(!response.ok)throw Error(result.error||'Code konnte nicht bestätigt werden.');
       $('mfaCode').value='';$('mfaQr').removeAttribute('src');$('mfaSecret').textContent='';
       if(result.recovery_codes?.length){$('mfaPanel').hidden=true;$('recoveryPanel').hidden=false;$('recoveryCodes').replaceChildren(...result.recovery_codes.map(code=>el('code',code)));}else location.replace('/admin');

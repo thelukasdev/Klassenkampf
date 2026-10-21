@@ -262,7 +262,8 @@ class PlayerAuth:
         length=int(headers.get('content-length','0'))
         if not 0<length<=4096:raise ValueError('Anfrage zu groß')
         ip=headers.get('x-forwarded-for','local').split(',')[-1].strip()
-        self.hit('requests:'+hashlib.sha256(ip.encode()).hexdigest(),30,900)
+        # A classroom can share one public IP; account limits stay much tighter.
+        self.hit('requests:'+hashlib.sha256(ip.encode()).hexdigest(),300,900)
         obj=json.loads(await asyncio.wait_for(reader.readexactly(length),5))
         if not isinstance(obj,dict):raise ValueError('Ungültige Anfrage')
         if route.endswith('/register'):await self.turnstile.verify(obj.get('turnstile_token'))
@@ -279,7 +280,8 @@ class PlayerAuth:
         if parseaddr(email)[1]!=email:raise ValueError('Bitte eine gültige E-Mail-Adresse eingeben.')
         self.hit('auth:'+email,10,900)
         if route.endswith('/reset-request'):
-            self.hit('send-ip:'+hashlib.sha256(ip.encode()).hexdigest(),5,900)
+            self.hit('send-email:'+email,3,900)
+            self.hit('send-ip:'+hashlib.sha256(ip.encode()).hexdigest(),60,900)
             token=await self.request_reset(email)
             await w.respond(writer,200,{'stage':'reset'},cookie=(self.RESET,token,300));return
         password=obj.get('password','')
@@ -298,6 +300,7 @@ class PlayerAuth:
             actor='player:'+email;self.store.log(actor,'player-login')
             token=self.store.new_session(actor)
             await w.respond(writer,200,{'stage':'authenticated'},cookie=(self.COOKIE,token,28800));return
-        self.hit('send-ip:'+hashlib.sha256(ip.encode()).hexdigest(),5,900)
+        self.hit('send-email:'+email,3,900)
+        self.hit('send-ip:'+hashlib.sha256(ip.encode()).hexdigest(),60,900)
         token=await self.challenge(email,encoded)
         await w.respond(writer,200,{'stage':'email'},cookie=(self.PENDING,token,300))

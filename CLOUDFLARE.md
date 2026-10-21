@@ -35,3 +35,26 @@ Cloudflare offen. Ein Wechsel auf DNS-only macht die Website absichtlich unerrei
 Diese Regel beschränkt den Zugriff auf die Cloudflare-Netze; sie authentifiziert
 nicht eine bestimmte Cloudflare-Zone. Für eine weitere Absicherung kommen ein
 eigener Origin-Pull-Clientschlüssel oder Cloudflare Tunnel infrage.
+
+## Rate Limit für Authentifizierung
+
+Eine aktive Cloudflare-Regel schützt ausschließlich POST-Anfragen auf:
+
+- `/auth/player/login`, `/auth/player/register`, `/auth/player/verify`
+- `/auth/player/reset-request`, `/auth/player/reset-confirm`
+- `/auth/password/login`, `/auth/password/mfa`
+
+Zusätzlich wird der Hostname auf die eigene Spieldomain eingeschränkt. Grenze:
+**60 Anfragen je IP in 10 Sekunden**, danach **10 Sekunden Block**. Beitrittscodes,
+WebSockets, laufende Spiele, Assets und Statusabfragen werden nicht mitgezählt.
+Cloudflare-Grenzen sind ein vorgelagerter Schutz und kein exakt globaler Zähler.
+
+Die Anwendung schützt zusätzlich einzelne Konten: 10 Authentifizierungsanfragen
+je E-Mail in 15 Minuten, höchstens 3 Bestätigungs-/Reset-Mails je E-Mail in
+15 Minuten. Für gemeinsame Schulnetzwerke gelten 300 Authentifizierungsanfragen
+und höchstens 60 Mail-Anfragen je IP in 15 Minuten. Die bestehende
+Admin-Anmeldung hat zusätzlich ihr eigenes enges Limit und Authenticator-2FA.
+
+Änderungen sollten anhand der Cloudflare-Ereignisse bewertet werden, insbesondere
+bei vielen gleichzeitigen Anmeldungen aus einem Schulnetz. Keine Spielverbindungen
+mit einer pauschalen Challenge-Regel unterbrechen.

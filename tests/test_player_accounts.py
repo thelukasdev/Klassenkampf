@@ -42,6 +42,35 @@ class PlayerAccountTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b'401',await self.http('/api/admin/overview',extra_headers=forged))
         self.assertIn(b'400',await self.http('/auth/player/verify',method='POST',extra_headers=pre,data={'code':code}))
         self.assertIn(b'403',await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'role','value':'player:owner@example.org','role':'admin'}))
+
+    async def test_classroom_shared_ip_and_per_account_login_limit(self):
+        h=await self.preauth()
+        # Forty users sharing one school gateway must not lock each other out.
+        with patch('player_auth.PasswordAuth.verify',return_value=False) as verify:
+            for n in range(40):
+                r=await self.http('/auth/player/login',method='POST',extra_headers=h,data={'email':f'p{n}@example.org','password':'wrong'})
+                self.assertIn(b'401',r)
+            for _ in range(9):
+                self.assertIn(b'401',await self.http('/auth/player/login',method='POST',extra_headers=h,data={'email':'p0@example.org','password':'wrong'}))
+            calls=verify.call_count
+            self.assertIn(b'400',await self.http('/auth/player/login',method='POST',extra_headers=h,data={'email':'p0@example.org','password':'wrong'}))
+            self.assertEqual(verify.call_count,calls)
+
+    async def test_recovery_limits_recipient_without_blocking_shared_classroom(self):
+        h=await self.preauth()
+        with patch.object(self.auth,'request_reset',return_value='test-reset-token') as reset:
+            for n in range(40):
+                self.assertIn(b'200',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':f'p{n}@example.org'}))
+            for _ in range(2):
+                self.assertIn(b'200',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':'p0@example.org'}))
+            calls=reset.call_count
+            self.assertIn(b'400',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':'p0@example.org'}))
+            self.assertEqual(reset.call_count,calls)
+            # Switching recipients still cannot bypass the shared IP mail ceiling.
+            for n in range(40,58):
+                self.assertIn(b'200',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':f'p{n}@example.org'}))
+            self.assertIn(b'400',await self.http('/auth/player/reset-request',method='POST',extra_headers=h,data={'email':'another@example.org'}))
+            self.assertEqual(reset.call_count,60)
     async def test_owned_session_limit_and_minimal_permissions(self):
         h,*_=await self.signup();private=self.hub.create('ADMIN PRIVATE')
         response=await self.http('/api/player/action',method='POST',extra_headers=h,data={'action':'create-session','value':'One','mode':'random'})
