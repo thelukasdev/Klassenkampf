@@ -1,0 +1,15 @@
+[Unit]
+Description=Restrict Klassenkampf public web ports to Cloudflare
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target docker.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/kk-origin-firewall
+ExecReload=/usr/local/sbin/kk-origin-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
