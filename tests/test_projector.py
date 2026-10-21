@@ -28,6 +28,7 @@ class ProjectorTests(unittest.IsolatedAsyncioTestCase):
         result=await self.public(token);data=self.body(result)
         self.assertIn(b'200',result);self.assertIn(b'Cache-Control: no-store',result)
         self.assertEqual(data['game'],'pong');self.assertEqual(set(data['frame']['views']),{'0'})
+        self.assertNotIn('ranking',data)  # Live frames must not repeatedly carry the leaderboard.
         for secret in (self.r.login_code,self.r.room_id,'token_hash','NEVER-PROJECT',token):self.assertNotIn(secret,json.dumps(data))
         self.assertIn(b'200',await self.http('/beamer'));self.assertIn(b'200',await self.http('/beamer.js'))
 

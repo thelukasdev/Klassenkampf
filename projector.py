@@ -28,9 +28,7 @@ class Projector:
 
     def payload(self):
         if not self.token or not getattr(self.room,'room_active',True):return None
-        players=sorted((p for p in self.room.players.values() if p.key not in self.room.banned),key=lambda p:(-p.credits,p.nick.casefold()))
         result={'session':getattr(self.room,'room_name','Klassenkampf'),'mode':'ranking','state':'ranking','revision':self.revision,
-                'ranking':[{'name':p.nick,'credits':p.credits} for p in players[:20]],
                 'online':sum(p.online for p in self.room.players.values()),'matches':len(self.room.matches)}
         if self.mode=='match':
             match=self.room.matches.get(self.match_id)
@@ -42,6 +40,9 @@ class Projector:
                     players=[p.nick for p in match.players],frame=public_frame,
                     reconnecting=[p.nick for p in match.disconnected])
             else:result['state']='finished'
+        if result['mode']=='ranking':
+            players=sorted((p for p in self.room.players.values() if p.key not in self.room.banned),key=lambda p:(-p.credits,p.nick.casefold()))
+            result['ranking']=[{'name':p.nick,'credits':p.credits} for p in players[:20]]
         return result
 
 

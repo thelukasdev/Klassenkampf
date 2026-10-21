@@ -11,3 +11,10 @@ Die Beamer-Seite ist rein passiv. Sie öffnet keinen Spieler-WebSocket und benö
 **Übertragung beenden** widerruft den Link. Eine erneute Freigabe erzeugt einen neuen Schlüssel. Sitzungsende und Serverneustart beenden die Freigabe ebenfalls. Die Auswahl und der Schlüssel liegen nur im Arbeitsspeicher; keine neue Datenbank oder dauerhafte Speicherung. Die Verwaltungsaktion wird ohne Freigabeschlüssel protokolliert. Bei Verbindungsfehlern entfernt die Seite das alte Bild und versucht die Verbindung erneut; ein widerrufener Link bleibt geschlossen.
 
 Tests: `python -m unittest discover -s tests -p test_projector.py -v`. Geprüft werden Freigabe, Schlüsselwechsel, Sitzungstrennung, Rechte/CSRF, Pausen, Spielende, verdeckte Ansichten und der öffentliche Datenumfang.
+
+Die Live-Antwort enthält keine ungenutzte Rangliste. Die Anzeige zeichnet nur neue
+Frames. In ausgeblendeten Tabs pausieren die Netzwerkabfragen; beim Zurückkehren
+wird die aktuelle Ansicht sofort angefordert. Netzwerkfehler verlängern den
+Wiederholungsabstand schrittweise auf höchstens zehn Sekunden. Es bleibt jeweils
+nur eine Abfrage gleichzeitig aktiv. Frontend-Prüfung:
+`node --test tests/test_beamer_performance.cjs`.
