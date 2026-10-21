@@ -2,7 +2,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const bootStarted=performance.now();let bootFinishTimer;
-  const bootTimer=setTimeout(()=>{if($('bootScreen').hidden)return;$('bootMessage').textContent='Die Verbindung dauert länger. Wir versuchen es weiter …';$('bootRetry').hidden=false;},8000);
+  const bootTimer=setTimeout(()=>{if($('bootScreen').hidden)return;diagnoseConnection();$('bootRetry').hidden=false;},8000);
   $('bootRetry').onclick=()=>location.reload();
   function finishBoot(){if($('bootScreen').hidden){tryAutoLogin();return;}clearTimeout(bootFinishTimer);bootFinishTimer=setTimeout(()=>{if(!ws||ws.readyState!==1||transportLost)return;clearTimeout(bootTimer);$('bootScreen').hidden=true;document.body.classList.remove('booting');document.body.removeAttribute('aria-busy');tryAutoLogin();},Math.max(0,2000-(performance.now()-bootStarted)));}
   const screens = ['login', 'nick', 'lobby', 'game'];
@@ -34,13 +34,30 @@
 
   // ---------------- WebSocket ----------------
   function connectionNotice(text) { if($('connectionNotice').textContent!==text)$('connectionNotice').textContent=text;$('connectionNotice').hidden=!text; }
+  let diagnosing=false,lastDiagnosis=0;
+  async function diagnoseConnection(){
+    if(diagnosing||Date.now()-lastDiagnosis<10000)return;diagnosing=true;lastDiagnosis=Date.now();
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),4000);
+    let message='';
+    try{
+      if(navigator.onLine===false)message='Du bist offline. Bitte Netzwerkverbindung prüfen.';
+      else{const response=await fetch('/healthz',{cache:'no-store',credentials:'omit',signal:controller.signal});message=response.ok?'Server erreichbar · Spielverbindung wird wiederhergestellt …':'Server momentan nicht bereit (HTTP '+response.status+'). Wir versuchen es weiter …';}
+    }catch{message='Website nicht erreichbar · Netzwerk, DNS oder sichere Verbindung prüfen. Wir versuchen es weiter …';}
+    finally{clearTimeout(timeout);diagnosing=false;}
+    if(!reconnectAllowed||ws?.readyState===1&&!transportLost)return;
+    connectionNotice(message);if(!$('bootScreen').hidden){$('bootMessage').textContent=message;$('bootRetry').hidden=false;}
+  }
+  window.addEventListener('offline',()=>{if(ws&&reconnectAllowed)lost(ws);connectionNotice('Du bist offline. Bitte Netzwerkverbindung prüfen.');if(!$('bootScreen').hidden)$('bootMessage').textContent='Du bist offline. Bitte Netzwerkverbindung prüfen.';});
+  window.addEventListener('online',()=>{if(transportLost&&ws?.readyState!==0)connect();});
   function lost(socket) {
     if(socket!==ws||!reconnectAllowed)return;
-    socket.onclose=null;socket.close();transportLost=true;recovering=true;window.pauseSketchGame?.(true);connectionNotice('Verbindung unterbrochen · Wiederverbinden …');
+    socket.onclose=null;socket.close();transportLost=true;recovering=true;window.pauseSketchGame?.(true);connectionNotice(navigator.onLine===false?'Du bist offline. Bitte Netzwerkverbindung prüfen.':'Verbindung unterbrochen · Wiederverbinden …');
     clearTimeout(retryTimer);retryTimer=setTimeout(connect,1000);
+    diagnoseConnection();
   }
   function connect() {
     clearTimeout(retryTimer);$('loginBtn').disabled=true;
+    if(navigator.onLine===false){transportLost=true;connectionNotice('Du bist offline. Bitte Netzwerkverbindung prüfen.');retryTimer=setTimeout(connect,2000);return;}
     const socket=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/');ws=socket;lastReceived=Date.now();
     socket.onopen=()=>{if(ws!==socket)return;$('loginBtn').disabled=false;};
     socket.onmessage=event=>{if(ws!==socket)return;lastReceived=Date.now();handle(JSON.parse(event.data));};
