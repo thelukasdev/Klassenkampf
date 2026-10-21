@@ -31,3 +31,5 @@ Thumbs.db
 .idea/
 legal.json
 *.private.json
+
+turnstile.json

@@ -35,6 +35,8 @@ class PlayerAuth:
             ''')
         from player_stats import PlayerStats
         self.personal_stats=PlayerStats(self.store)
+        from turnstile import Turnstile
+        self.turnstile=Turnstile(self.web)
 
     def stats(self,email):
         return self.personal_stats.get(email)
@@ -205,7 +207,7 @@ class PlayerAuth:
     async def handle(self,reader,writer,method,route,headers):
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
-            token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready},cookie=(self.CSRF,token,600));return
+            token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready,'turnstile_sitekey':self.turnstile.sitekey},cookie=(self.CSRF,token,600));return
         if route=='/auth/player/stats':
             session=self.session(headers)
             if not session:raise Denied('Bitte erneut anmelden.')
@@ -263,6 +265,7 @@ class PlayerAuth:
         self.hit('requests:'+hashlib.sha256(ip.encode()).hexdigest(),30,900)
         obj=json.loads(await asyncio.wait_for(reader.readexactly(length),5))
         if not isinstance(obj,dict):raise ValueError('Ungültige Anfrage')
+        if route.endswith('/register'):await self.turnstile.verify(obj.get('turnstile_token'))
         if route.endswith('/reset-confirm'):
             password=obj.get('password','')
             if not isinstance(password,str) or not 12<=len(password)<=256:raise ValueError('Passwort muss 12 bis 256 Zeichen lang sein.')
