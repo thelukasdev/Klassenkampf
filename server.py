@@ -389,6 +389,8 @@ class Server:
         self.admin_port = admin_port
         self.max_connections = max_connections
         self.connections = set()
+        from monitoring_metrics import Metrics
+        self.metrics=hub.server.metrics if hub else Metrics(self)
         self.failed_logins = deque(maxlen=120)
         self.session_hub = None
         self.room_id = room_id
@@ -664,6 +666,7 @@ class Server:
                 ValueError, UnicodeError):
             pass
         except Exception:
+            self.metrics.exceptions+=1
             logging.exception('Connection handler failed')
         finally:
             self.connections.discard(writer)
@@ -696,56 +699,68 @@ class Server:
             k, _, v = line.decode("latin1").partition(":")
             headers[k.strip().lower()] = v.strip()
 
-        if urlsplit(path).path=='/api/replay-share':
-            try:
-                if method!='GET':raise ValueError('Replay nicht verfügbar')
-                query=__import__('urllib.parse',fromlist=['parse_qs']).parse_qs(urlsplit(path).query)
-                index=int(query['chunk'][0]) if 'chunk' in query else None
-                result=await asyncio.to_thread(self.replays.shared,headers.get('x-replay-token',''),index)
-                await self.web_admin.respond(writer,200,{'result':result})
-            except (ValueError,OSError):
-                await self.web_admin.respond(writer,404,{'error':'Replay nicht verfügbar oder Freigabe beendet.'})
-        elif urlsplit(path).path=='/api/beamer':
-            from projector import find
-            projection=find(self,headers.get('x-projector-token','')) if method=='GET' else None
-            data=projection.payload() if projection else None
-            await self.web_admin.respond(writer,200 if data else 404,data or {'error':'Übertragung beendet oder nicht verfügbar.'})
-        elif urlsplit(path).path=='/api/watch':
-            token=headers.get('x-spectator-token','')
-            match=None
-            if method=='GET' and 20<=len(token)<=64 and self.session_hub:
-                match=next((m for r in self.session_hub.rooms.values() for m in r.matches.values()
-                            if m.spectator_token and secrets.compare_digest(token.encode(),m.spectator_token.encode())),None)
-            if not match or match.game.per_view or match.finished:
-                await self.web_admin.respond(writer,404,{'error':'Freigabe beendet oder nicht verfügbar.'})
-            else:
-                await self.web_admin.respond(writer,200,{'game':match.gid,'name':match.name,'players':[p.nick for p in match.players],
-                    'paused':match.is_paused,'frame':match.last_frame})
-        elif urlsplit(path).path=='/internal/status.json':
+        if urlsplit(path).path=='/internal/metrics':
             token=os.environ.get('KLASSENKAMPF_STATUS_TOKEN','')
             if method!='GET' or not token or not secrets.compare_digest(headers.get('authorization','').encode(),('Bearer '+token).encode()):
-                await self._http_response(writer,404,b'Not found')
-                return
-            from status_snapshot import snapshot
-            try:body=json.dumps(snapshot(self)).encode()
-            except Exception:body=json.dumps({'version':1,'database':'down','sessions':[]}).encode()
-            await self._http_response(writer,200,body)
-        elif urlsplit(path).path.startswith(('/auth/', '/api/admin/', '/api/player/')):
-            await self.web_admin.handle(reader, writer, method, path, headers)
-        elif headers.get("upgrade", "").lower() == "websocket":
-            if method != 'GET' or urlsplit(path).path != '/':
-                await self._http_response(writer, 400, b'Invalid WebSocket request')
-                return
-            origin = headers.get('origin')
-            expected = self.public_origin
-            if not expected and origin:
-                expected = 'http://' + headers.get('host', '')
-            if (expected and origin != expected) or headers.get('sec-websocket-version') != '13':
-                await self._http_response(writer, 403, b'Origin or version rejected')
-                return
-            await self._do_websocket(reader, writer, headers)
-        else:
-            await self._serve_http(writer, method, path, headers)
+                await self._http_response(writer,404,b'Not found');return
+            body=self.metrics.render()
+            writer.write(('HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: '+str(len(body))+'\r\n\r\n').encode()+body)
+            await writer.drain();return
+        observed=headers.get('upgrade','').lower()!='websocket' and not urlsplit(path).path.startswith('/internal/')
+        started=time.monotonic()
+        try:
+            if urlsplit(path).path=='/api/replay-share':
+                try:
+                    if method!='GET':raise ValueError('Replay nicht verfügbar')
+                    query=__import__('urllib.parse',fromlist=['parse_qs']).parse_qs(urlsplit(path).query)
+                    index=int(query['chunk'][0]) if 'chunk' in query else None
+                    result=await asyncio.to_thread(self.replays.shared,headers.get('x-replay-token',''),index)
+                    await self.web_admin.respond(writer,200,{'result':result})
+                except (ValueError,OSError):
+                    await self.web_admin.respond(writer,404,{'error':'Replay nicht verfügbar oder Freigabe beendet.'})
+            elif urlsplit(path).path=='/api/beamer':
+                from projector import find
+                projection=find(self,headers.get('x-projector-token','')) if method=='GET' else None
+                data=projection.payload() if projection else None
+                await self.web_admin.respond(writer,200 if data else 404,data or {'error':'Übertragung beendet oder nicht verfügbar.'})
+            elif urlsplit(path).path=='/api/watch':
+                token=headers.get('x-spectator-token','')
+                match=None
+                if method=='GET' and 20<=len(token)<=64 and self.session_hub:
+                    match=next((m for r in self.session_hub.rooms.values() for m in r.matches.values()
+                                if m.spectator_token and secrets.compare_digest(token.encode(),m.spectator_token.encode())),None)
+                if not match or match.game.per_view or match.finished:
+                    await self.web_admin.respond(writer,404,{'error':'Freigabe beendet oder nicht verfügbar.'})
+                else:
+                    await self.web_admin.respond(writer,200,{'game':match.gid,'name':match.name,'players':[p.nick for p in match.players],
+                        'paused':match.is_paused,'frame':match.last_frame})
+            elif urlsplit(path).path=='/internal/status.json':
+                token=os.environ.get('KLASSENKAMPF_STATUS_TOKEN','')
+                if method!='GET' or not token or not secrets.compare_digest(headers.get('authorization','').encode(),('Bearer '+token).encode()):
+                    await self._http_response(writer,404,b'Not found')
+                    return
+                from status_snapshot import snapshot
+                try:body=json.dumps(snapshot(self)).encode()
+                except Exception:body=json.dumps({'version':1,'database':'down','sessions':[]}).encode()
+                await self._http_response(writer,200,body)
+            elif urlsplit(path).path.startswith(('/auth/', '/api/admin/', '/api/player/')):
+                await self.web_admin.handle(reader, writer, method, path, headers)
+            elif headers.get("upgrade", "").lower() == "websocket":
+                if method != 'GET' or urlsplit(path).path != '/':
+                    await self._http_response(writer, 400, b'Invalid WebSocket request')
+                    return
+                origin = headers.get('origin')
+                expected = self.public_origin
+                if not expected and origin:
+                    expected = 'http://' + headers.get('host', '')
+                if (expected and origin != expected) or headers.get('sec-websocket-version') != '13':
+                    await self._http_response(writer, 403, b'Origin or version rejected')
+                    return
+                await self._do_websocket(reader, writer, headers)
+            else:
+                await self._serve_http(writer, method, path, headers)
+        finally:
+            if observed:self.metrics.observe(path,time.monotonic()-started)
 
     async def _serve_http(self, writer, method, path, headers=None):
         if method not in ('GET', 'HEAD'):
@@ -919,6 +934,7 @@ class Server:
         player = None
         recent_messages = deque(maxlen=241)
         await conn.send({"t": "welcome", "games": games.GAME_INFO, "mode": self.mode})
+        self.metrics.websocket_connections+=1
         try:
             while True:
                 msg = await asyncio.wait_for(wsutil.read_message(reader), 45)
@@ -946,6 +962,7 @@ class Server:
                     await conn.send({'t':'pong'});continue
                 player = await self._on_message(conn, player, obj)
         finally:
+            self.metrics.websocket_disconnects+=1
             conn.alive = False
             arena = getattr(conn, 'arena', self)
             if hasattr(arena, 'joined_connections'):

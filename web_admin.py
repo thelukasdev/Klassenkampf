@@ -156,6 +156,7 @@ class WebAdmin:
             return ''
 
     async def respond(self, writer, status, obj=None, *, location=None, cookie=None):
+        if status>=500:self.server.metrics.errors+=1
         body = json.dumps(obj or {}, ensure_ascii=False).encode()
         reasons = {200:'OK', 303:'See Other', 400:'Bad Request', 401:'Unauthorized',
                    403:'Forbidden', 404:'Not Found', 405:'Method Not Allowed', 503:'Service Unavailable'}
@@ -238,7 +239,7 @@ class WebAdmin:
             session = self.player_auth.session(headers) if player_scope else self.store.session(token)
             if session and not player_scope and session['role']=='host':session=None
             if route == '/api/admin/me' and method == 'GET':
-                await self.respond(writer, 200, {'user': session, 'login_ready': True if player_scope else self.password_auth.ready})
+                await self.respond(writer, 200, {'user': session, 'login_ready': True if player_scope else self.password_auth.ready,'monitoring_url':__import__('monitoring_metrics').dashboard_url() if session and not player_scope and session['role'] in ('owner','admin') else ''})
                 return
             if not session:
                 await self.respond(writer, 401, {'error':'Bitte mit E-Mail-Adresse und Passwort anmelden.'})
