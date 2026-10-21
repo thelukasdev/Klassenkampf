@@ -75,6 +75,7 @@ CREDIT_DRAW = 1
 MIME = {
     ".html": "text/html; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
+    ".webp": "image/webp",
     ".css": "text/css; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
@@ -789,25 +790,20 @@ class Server:
             return
         if Path(safe).name.lower()=='report.html' and not self.web_admin.reports.session(headers or {}):
             await self.web_admin.respond(writer,303,location='/login');return
-        body = None
+        from static_delivery import delivery
         ext = os.path.splitext(safe)[1]
-        if _EMBED is not None:                     # Single-File-Build
+        ctype = MIME.get(ext, "application/octet-stream")
+        if _EMBED is not None:
             body = _EMBED.get(safe)
-        else:                                      # Dateien von der Platte
-            full = (Path(STATIC) / safe).resolve()
-            if full.is_relative_to(Path(STATIC).resolve()) and full.is_file():
-                with open(full, "rb") as f:
-                    body = f.read()
-        if body is None:
-            await self._not_found(writer,method)
-            return
+            if body is None:
+                await self._not_found(writer,method);return
+            response=delivery.response(safe,ctype,method,headers or {},embedded=body)
         else:
-            ctype = MIME.get(ext, "application/octet-stream")
-            header = (f"HTTP/1.1 200 OK\r\nContent-Type: {ctype}\r\n"
-                      f"Content-Length: {len(body)}\r\n"
-                      f"Cache-Control: no-cache, no-store, must-revalidate\r\n"
-                      f"Connection: close\r\n\r\n")
-            writer.write(header.encode() + (b'' if method == 'HEAD' else body))
+            full = (Path(STATIC) / safe).resolve()
+            if not full.is_relative_to(Path(STATIC).resolve()) or not full.is_file():
+                await self._not_found(writer,method);return
+            response=delivery.response(full,ctype,method,headers or {})
+        writer.write(response)
         try:
             await writer.drain()
         except ConnectionError:

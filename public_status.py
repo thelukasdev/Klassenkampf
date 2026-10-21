@@ -241,11 +241,16 @@ def make_handler(store,static_dir):
                 else:
                     files={'/status':'status.html','/status/':'status.html','/status/status.css':'status.css',
                            '/status/cookie-notice.js':'cookie-notice.js','/status/cookie-notice.css':'cookie-notice.css',
-                           '/status/status.js':'status.js','/status/lp-logo.png':'lp-logo.png'}
+                           '/status/status.js':'status.js','/status/lp-logo.png':'lp-logo.png',
+                           '/status/lp-logo-small.webp':'lp-logo-small.webp','/status/lp-icon.png':'lp-icon.png'}
                     if route.path not in files:
                         self.reply(404,(static_dir/'404.html').read_bytes(),'text/html; charset=utf-8');return
-                    name=files[route.path];body=(static_dir/name).read_bytes()
-                    ctype={'html':'text/html; charset=utf-8','css':'text/css; charset=utf-8','js':'application/javascript; charset=utf-8','png':'image/png'}[name.rsplit('.',1)[1]]
+                    name=files[route.path]
+                    ctype={'html':'text/html; charset=utf-8','css':'text/css; charset=utf-8','js':'application/javascript; charset=utf-8','png':'image/png','webp':'image/webp'}[name.rsplit('.',1)[1]]
+                    from static_delivery import delivery
+                    response=delivery.response(static_dir/name,ctype,self.command,{k.lower():v for k,v in self.headers.items()})
+                    security=b"\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+                    self.wfile.write(response.replace(b'\r\n\r\n',security+b'\r\n\r\n',1));self.close_connection=True;return
                 self.reply(200,body,ctype)
             except (ValueError,TypeError):self.reply(400,b'Invalid query','text/plain')
             except Exception:self.reply(503,b'Status temporarily unavailable','text/plain')

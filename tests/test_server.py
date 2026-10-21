@@ -116,7 +116,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(b'404 Not Found',headers)
             self.assertIn(b'Content-Type: text/html; charset=utf-8',headers)
             self.assertIn(b'Seite nicht gefunden',body)
-            self.assertIn(b'/lp-logo.png',body)
+            self.assertIn(b'/lp-icon.png',body)
             self.assertIn(b'Zur Startseite',body)
             self.assertNotIn(b'<script>',body)
 
