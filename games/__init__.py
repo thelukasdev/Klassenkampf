@@ -8,13 +8,14 @@ from .connect4 import Connect4
 from .dots import Dots
 from .bomber import Bomber
 from .jnb import JumpNBump
+from .sketch import Sketch
 
 # Reihenfolge = Anzeigereihenfolge in der Lobby
-GAME_CLASSES = [Tron, Pong, Duel, Tanks, WnR, Connect4, Dots, Bomber, JumpNBump]
+GAME_CLASSES = [Tron, Pong, Duel, Tanks, WnR, Connect4, Dots, Bomber, JumpNBump, Sketch]
 GAMES = {cls.gid: cls for cls in GAME_CLASSES}
 
 GAME_INFO = [
-    {"id": cls.gid, "name": cls.name, "tick_ms": cls.tick_ms, "max": cls.max_players}
+    {"id": cls.gid, "name": cls.name, "tick_ms": cls.tick_ms, "max": cls.max_players, "min": cls.min_players}
     for cls in GAME_CLASSES
 ]
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Klassenkampf</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/sketch.css">
 <link rel="stylesheet" href="/cookie-notice.css"></head>
 <body class="booting" aria-busy="true">
 <section id="bootScreen" aria-label="Klassenkampf laden">
@@ -79,6 +79,7 @@
     </div>
     <div class="ghint" id="gHint"></div>
   </div>
+  <section id="sketchPanel" hidden><div class="sketch-top"><strong id="sketchRound"></strong><span id="sketchRole"></span><strong id="sketchTime"></strong></div><h2 id="sketchWord"></h2><div class="sketch-layout"><div class="sketch-board"><canvas id="sketchCanvas" width="640" height="400" aria-label="Gemeinsame Zeichenfläche"></canvas><div id="sketchTools" hidden><div id="sketchColors" role="group" aria-label="Zeichenfarbe"></div><label>Stift <select id="sketchWidth" aria-label="Stiftbreite"><option value="1">Fein</option><option value="2" selected>Normal</option><option value="4">Breit</option><option value="8">Sehr breit</option></select></label><button id="sketchClear" class="btn mini" type="button">Leeren</button></div><form id="sketchGuessForm"><label class="sketch-label" for="sketchGuess">Dein Tipp</label><div><input id="sketchGuess" type="text" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Begriff erraten" required><button id="sketchSend" class="btn primary" type="submit">Raten</button></div></form><p id="sketchWait"></p><p id="sketchFeedback" role="status"></p></div><aside class="sketch-side"><h3>Punkte</h3><ol id="sketchScores"></ol><h3>Tipps</h3><ol id="sketchChat" aria-live="polite"></ol></aside></div></section>
   <div class="canvas-wrap">
     <canvas id="c" width="240" height="280"></canvas>
     <div class="pad" id="pad">
@@ -112,6 +113,6 @@
 
 <script src="/jnb_assets.js"></script>
 <script src="/render.js"></script>
-<script src="/round-ui.js"></script><script src="/app.js"></script><script src="/account-nav.js"></script>
+<script src="/sketch.js"></script><script src="/round-ui.js"></script><script src="/app.js"></script><script src="/account-nav.js"></script>
 <script src="/cookie-notice.js"></script></body>
 </html>

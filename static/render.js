@@ -460,7 +460,11 @@
     }
   }
 
-  const RENDERERS = { tron, pong, duel, tanks, wnr, c4, dots, bomber, jnb };
+  const SKETCH_COLORS=['#14171b','#e43945','#258a43','#246de0','#eab722','#9b45bf','#808080','#ffffff'];
+  window.paintSketch=(ctx,encoded,width=640,height=400,extra=[])=>{ctx.save();ctx.fillStyle='#ffffff';ctx.fillRect(0,0,width,height);ctx.scale(width/256,height/160);ctx.lineCap='round';ctx.lineJoin='round';const segment=(x,y,xx,yy,color,size)=>{ctx.strokeStyle=ctx.fillStyle=SKETCH_COLORS[color]||SKETCH_COLORS[0];ctx.lineWidth=size;ctx.beginPath();if(x===xx&&y===yy){ctx.arc(x,y,size/2,0,Math.PI*2);ctx.fill();}else{ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();}};try{const raw=atob(encoded||'');if(raw.length<=5120)for(let i=0;i+4<raw.length;i+=5){const style=raw.charCodeAt(i+4);segment(raw.charCodeAt(i),raw.charCodeAt(i+1),raw.charCodeAt(i+2),raw.charCodeAt(i+3),style>>3,(style&7)+1);}}catch{}for(const s of extra)segment(...s);ctx.restore();};
+  function sketch(ctx,s,role){text(ctx,'Zeichnen & Raten',120,14,COL.HEAD,12,true);text(ctx,'Runde '+s.turn+'/'+s.total+' · '+s.seconds+' s',120,30,COL.TEXT,10);ctx.save();ctx.translate(0,45);window.paintSketch(ctx,s.drawing,240,150);ctx.restore();text(ctx,s.word||s.hint,120,217,COL.P1,13,true);text(ctx,s.phase==='reveal'?'Auflösung':s.drawer===role?'Du zeichnest':'Spieler '+s.drawer+' zeichnet',120,238,COL.DIM,10);text(ctx,Object.entries(s.scores).map(([p,n])=>'P'+p+': '+n).join('  '),120,264,COL.TEXT,8);}
+
+  const RENDERERS = { tron, pong, duel, tanks, wnr, c4, dots, bomber, jnb, sketch };
 
   window.drawGame = function (gid, s, role, ctx, R) {
     rect(ctx, 0, 0, W, H, COL.BG);

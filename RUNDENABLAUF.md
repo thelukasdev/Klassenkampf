@@ -2,9 +2,9 @@
 
 Beim Erstellen einer Sitzung kann die Spielleitung „Mit Warteraum starten“ aktivieren, sowohl im einfachen Spielerkonto als auch in der Verwaltung. Jeder verbundene Spieler meldet sich bereit. Ab zwei verbundenen Spielern und sobald alle bereit sind, kann die Spielleitung die Sitzung freigeben. Erst dann sind Herausforderungen und Matchstarts möglich. Die Freigabe öffnet die gewohnte Spielauswahl; sie teilt keine Gegner automatisch zu. Neue Sitzungen ohne diese Option funktionieren sofort wie bisher.
 
-Nach einer beendeten Partie mit zwei oder drei Teilnehmern können dieselben Spieler eine Revanche im selben Minispiel zusagen. Erst wenn alle zugesagt haben, startet die nächste Partie. Die Einladung verfällt nach 60 Sekunden.
+Nach einer beendeten Partie mit zwei, drei oder fünf bis acht Teilnehmern können dieselben Spieler eine Revanche im selben Minispiel zusagen. Erst wenn alle zugesagt haben, startet die nächste Partie. Die Einladung verfällt nach 60 Sekunden.
 
-Nach einer regulär beendeten Viererpartie beginnt automatisch eine Abstimmung zwischen den freigegebenen Spielen für vier Teilnehmer: Neon Tail (Tron), Bomber und Jump’n’Bump. Alle vier müssen innerhalb von 30 Sekunden abstimmen. Die meisten Stimmen entscheiden; bei Gleichstand wird zwischen den gleichauf liegenden Spielen gelost. Eine Stimme kann bis zur Entscheidung geändert werden. Vier Spieler in der Lobby allein lösen keine Abstimmung aus.
+Nach einer regulär beendeten Viererpartie beginnt automatisch eine Abstimmung zwischen den freigegebenen Spielen für vier Teilnehmer: Neon Tail (Tron), Bomber und Jump’n’Bump sowie Zeichnen & Raten (mindestens vier Spieler). Alle vier müssen innerhalb von 30 Sekunden abstimmen. Die meisten Stimmen entscheiden; bei Gleichstand wird zwischen den gleichauf liegenden Spielen gelost. Eine Stimme kann bis zur Entscheidung geändert werden. Vier Spieler in der Lobby allein lösen keine Abstimmung aus.
 
 „Gruppe verlassen“, ein Verbindungsabbruch, eine Sperre oder der Start einer anderen Partie schließt das gemeinsame Angebot für alle. Nach administrativem Abbruch, technischen Fehlern oder einer unvollständig beendeten Viererpartie entsteht keine Abstimmung. Die bestehende Wiederverbindung während laufender Partien bleibt erhalten. Eine pausierte Sitzung erlaubt keine neuen Zusagen; abgelaufene Angebote werden geschlossen.
 

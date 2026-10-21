@@ -220,7 +220,7 @@ class Match:
 
     def start_message(self,p):
         names=[q.nick for q in self.players]
-        return {'t':'match_start','game':self.gid,'name':self.name,'role':p.role,
+        return {'t':'match_start','id':self.id,'game':self.gid,'name':self.name,'role':p.role,
                 'opp':' / '.join(q.nick for q in self.players if q is not p),'names':names}
 
     async def pause_notice(self):
@@ -259,8 +259,7 @@ class Match:
         names = [p.nick for p in self.players]
         for role, p in enumerate(self.players, 1):
             opp = " / ".join(n for i, n in enumerate(names, 1) if i != role)
-            await self._send(p, {"t": "match_start", "game": self.gid, "name": self.name,
-                                 "role": role, "opp": opp, "names": names})
+            await self._send(p,self.start_message(p))
         loop = asyncio.get_running_loop()
         next_t = loop.time()
         try:
@@ -275,9 +274,9 @@ class Match:
                     await asyncio.sleep(.1)
                     continue
                 if hasattr(g,'step'):
-                    await g.step(self.server.rules['speed'])
+                    await g.step(1 if getattr(g,'speed_fixed',False) else self.server.rules['speed'])
                 else:
-                    for _ in range(self.server.rules['speed']): g.tick()
+                    for _ in range(1 if getattr(g,'speed_fixed',False) else self.server.rules['speed']): g.tick()
                 await self._broadcast_state()
                 if g.result is not None:
                     await self._end_by_result(g.result)
@@ -339,6 +338,8 @@ class Match:
         self._award(quitter, "loss")
         await self._send(quitter, {"t": "match_end", "result": "loss",
                                    "credits": quitter.credits,"delta":quitter.credits-self.initial_credits[quitter.nick], "reason": "you_disconnected" if reason=="connection_timeout" else "you_left"})
+        if len(rest)<games.GAMES[self.gid].min_players and games.GAMES[self.gid].min_players>2:
+            await self.server.control.cancel_match(self,'not_enough_players');return
         if len(rest) == 1:
             self.finished = True
             winner = rest[0]
@@ -442,7 +443,7 @@ class Server:
     def _state_dict(self):
         return {"players": {p.nick: p.to_dict() for p in self.players.values()},
                 "banned": sorted(self.banned),
-                "mode": self.mode,"rules":self.rules,"history":self.history}
+                "mode": self.mode,"rules":self.rules,"history":self.history,"registry":list(games.GAMES)}
 
     def save(self):
         if self.hub:
@@ -456,7 +457,11 @@ class Server:
 
     def _apply_state(self, data):
         """Zustand aus einem dict uebernehmen (Spieler/Credits/Bann/Modus)."""
+        previous=set(data.get('registry',set(games.GAMES)-{'sketch'}))
         self.rules.update(data.get('rules',{}))
+        if set(self.rules['enabled'])==previous:
+            self.rules['enabled']=list(games.GAMES)
+        else:self.rules['enabled']=[g for g in self.rules['enabled'] if g in games.GAMES]
         self.history=list(data.get('history',[]))[-2000:]
         self.players.clear()
         self.by_pid.clear()
@@ -509,7 +514,7 @@ class Server:
         out = None
         c = me.out_challenge
         if c:
-            out = {"gname": gname(c.gid), "max": self._max_targets(c.gid),
+            out = {"gname": gname(c.gid), "max": self._max_targets(c.gid), "manual":bool(c.gid and getattr(games.GAMES[c.gid],"manual_start",False)), "min":games.GAMES[c.gid].min_players if c.gid else min(games.GAMES[g].min_players for g in self.rules["enabled"]),
                    "targets": [{"pid": q, "nick": self.by_pid[q].nick, "acc": st == "accepted"}
                                for q, st in c.targets.items() if q in self.by_pid]}
         return {"t": "lobby", "players": players, "incoming": incoming,
@@ -555,9 +560,11 @@ class Server:
         n = 1 + len(acc)
         gid = c.gid
         if gid is None:                       # Zufallsmodus -> jetzt Spiel wuerfeln
-            candidates=[g for g, cls in games.GAMES.items() if cls.max_players >= n and g in self.rules['enabled']]
+            candidates=[g for g, cls in games.GAMES.items() if cls.min_players<=n<=cls.max_players and g in self.rules['enabled']]
             if not candidates:return
             gid=random.choice(candidates)
+        if n<games.GAMES[gid].min_players:return
+        if c.gid and getattr(games.GAMES[gid],'manual_start',False) and not force:return
         c.src.out_challenge = None
         for q, st in list(c.targets.items()):
             p = self.by_pid.get(q)
@@ -586,7 +593,7 @@ class Server:
         if self.hub:
             live=sum(bool(r.matches) for r in self.hub.rooms.values())
             if not self.matches and live>=8: raise ValueError('Serverkapazitaet erreicht. Bitte spaeter starten.')
-        if len(players)<2 or len(players)>games.GAMES[gid].max_players or len({p.pid for p in players})!=len(players) or any(p.busy for p in players):raise ValueError('Teilnehmer nicht verfügbar.')
+        if len(players)<games.GAMES[gid].min_players or len(players)>games.GAMES[gid].max_players or len({p.pid for p in players})!=len(players) or any(p.busy for p in players):raise ValueError('Teilnehmer nicht verfügbar.')
         for p in players:self.flow.drop(p)
         m = Match(self, gid, players)
         self.matches[m.id] = m
@@ -1015,7 +1022,19 @@ class Server:
                     await self._maybe_start(c)
             await self.push_lobby()
 
+        elif t == 'sketch':
+            match=player.match
+            if match and not match.finished and not match.is_paused and match.gid=='sketch' and obj.get('mid')==match.id:
+                now=time.monotonic();start,count=getattr(player,'sketch_window',(now,0))
+                if now-start>=1:start,count=now,0
+                if count>=30:return player
+                player.sketch_window=(start,count+1)
+                from games.sketch import clean_event
+                event=clean_event(obj)
+                if event:match.game.handle_event(player.role,event)
+
         elif t == "in":
+            if player.match and player.match.gid=="sketch":return player
             if player.match and not player.match.finished and not player.match.is_paused:
                 try:
                     player.match.game.set_input(player.role, int(obj.get("u", 0)) & 0x3F)

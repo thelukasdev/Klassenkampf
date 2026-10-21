@@ -45,10 +45,10 @@ class RoundFlow:
         players=list(match.players)
         if getattr(match,'followup_blocked',False) or self.waiting or not getattr(self.room,'room_active',True) or match.end_reason not in ('normal','leave'):return
         if any(getattr(p,'skip_offer_for',None)==match.id for p in players):return
-        if len(players)<2 or len(players)>4 or any(not p.online or p.busy or p.key in self.room.banned for p in players):return
+        if len(players)<2 or len(players)>8 or any(not p.online or p.busy or p.key in self.room.banned for p in players):return
         if len(players)==4:
             if match.end_reason!='normal' or match.left:return
-            choices=[g for g in self.room.rules['enabled'] if games.GAMES[g].max_players>=4]
+            choices=[g for g in self.room.rules['enabled'] if games.GAMES[g].min_players<=4<=games.GAMES[g].max_players]
             kind='vote'
         else:choices=[match.gid] if match.gid in self.room.rules['enabled'] else [];kind='rematch'
         if not choices:return

@@ -115,12 +115,12 @@ class Recorder:
 
     def capture(self,frame):
         if self.closed or frame['t']<self.next:return
-        self.next=frame['t']+.1
+        self.next=frame['t']+getattr(self.match.game,'replay_interval',.1)
         raw=json.dumps(frame,separators=(',',':')).encode()
         if self.raw+len(raw)>MAX_RAW:
             self.truncated=True;self.finish('limit');return
         self.raw+=len(raw);self.buffer.append(raw);self.last_t=frame['t']
-        if len(self.buffer)>=100:
+        if len(self.buffer)>=getattr(self.match.game,'replay_batch',100):
             try:self.queue.put_nowait(self.buffer);self.buffer=[]
             except asyncio.QueueFull:self.truncated=True;self.buffer=[];self.finish('limit')
 

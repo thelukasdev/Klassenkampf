@@ -58,7 +58,7 @@ class ControlTests(unittest.IsolatedAsyncioTestCase):
         w=SessionWorker()
         try:
             for gid,cls in games.GAMES.items():
-                g=RemoteGame(w,gid,gid,2);await g.step();self.assertTrue(g.snapshot(1) if cls.per_view else g.snapshot());await g.close()
+                g=RemoteGame(w,gid,gid,cls.min_players);await g.step();self.assertTrue(g.snapshot(1) if cls.per_view else g.snapshot());await g.close()
         finally:await w.stop()
     async def test_rules_pause_neutral_cancel_history_and_restore(self):
         r=self.hub.get(self.a['id']);p=r._add_player('one');q=r._add_player('two')

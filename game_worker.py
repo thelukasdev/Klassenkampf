@@ -62,10 +62,15 @@ class RemoteGame:
         self.worker=worker; self.key=str(key); self.gid=gid; self.n=n
         self.tick_ms=games.GAMES[gid].tick_ms
         self.per_view=games.GAMES[gid].per_view
+        self.speed_fixed=getattr(games.GAMES[gid],"speed_fixed",False)
+        self.replay_interval=getattr(games.GAMES[gid],"replay_interval",.1)
+        self.replay_batch=getattr(games.GAMES[gid],"replay_batch",100)
         self.result=None; self.commands=[]; self.snapshots={}; self.ready=False
     def set_input(self,p,mask):
         # Accumulate edges while bounding messages from a noisy client.
         if len(self.commands)<256:self.commands.append(['input',p,mask])
+    def handle_event(self,p,event):
+        if self.gid=="sketch" and len(self.commands)<256:self.commands.append(["sketch",p,event])
     def reset_inputs(self):
         self.commands=[cmd for cmd in self.commands if cmd[0] not in ('input','reset')]
         self.commands.append(['reset'])

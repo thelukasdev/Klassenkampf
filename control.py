@@ -12,7 +12,7 @@ class ArenaControl:
         if m.finished:return
         m.finished=True;m.end_reason=reason
         for p in m.active:
-            await m._send(p,{'t':'match_cancelled','msg':'Partie durch Spielleitung beendet.' if reason=='admin' else 'Partie ohne Wertung beendet: Alle Spieler haben die Verbindung verloren.' if reason=='connection_lost' else 'Partie wegen eines technischen Fehlers beendet.'})
+            await m._send(p,{'t':'match_cancelled','msg':'Partie durch Spielleitung beendet.' if reason=='admin' else 'Partie ohne Wertung beendet: Alle Spieler haben die Verbindung verloren.' if reason=='connection_lost' else 'Partie ohne weitere Wertung beendet: Zeichnen & Raten benötigt mindestens vier Spieler.' if reason=='not_enough_players' else 'Partie wegen eines technischen Fehlers beendet.'})
         self.room.close_match(m)
         if m.task and m.task is not asyncio.current_task():
             m.task.cancel(); await asyncio.gather(m.task,return_exceptions=True)

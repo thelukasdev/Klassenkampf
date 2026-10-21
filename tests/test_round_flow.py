@@ -72,7 +72,7 @@ class RoundFlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_four_player_vote_majority_only_after_all_four(self):
         peers,old,offer=await self.finish(4,'tron')
-        self.assertEqual(offer['kind'],'vote');self.assertEqual(set(offer['choices']),{'tron','bomber','jnb'})
+        self.assertEqual(offer['kind'],'vote');self.assertEqual(set(offer['choices']),{'tron','bomber','jnb','sketch'})
         for index,(r,w,p) in enumerate(peers):
             await self.room.flow.handle(p,{'t':'round_vote','id':offer['id'],'game':'bomber' if index<3 else 'tron'})
             self.assertEqual(len(self.room.matches),int(index==3))

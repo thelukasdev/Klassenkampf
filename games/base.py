@@ -50,6 +50,7 @@ class Game:
     # pro Tick nur EIN Snapshot gebaut und an alle Spieler geschickt.
     per_view = False
     # Hoechstzahl Spieler (Herausforderer + bis zu max_players-1 Gegner)
+    min_players = 2
     max_players = 2
 
     def __init__(self, n=2):

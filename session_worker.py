@@ -21,6 +21,7 @@ def main():
                 for cmd in obj.get('commands',[]):
                     if cmd[0]=='input': g.set_input(cmd[1],cmd[2])
                     elif cmd[0]=='reset': g.reset_inputs()
+                    elif cmd[0]=='sketch' and g.gid=='sketch':g.handle_event(cmd[1],cmd[2])
                     elif cmd[0]=='remove': g.remove_player(cmd[1])
                 for _ in range(obj.get('ticks',1)): g.tick()
                 result={'result':g.result,'snapshots':{str(i):g.snapshot(view=i) for i in range(1,g.n+1)} if g.per_view else {'0':g.snapshot()}}

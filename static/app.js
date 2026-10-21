@@ -6,7 +6,7 @@
   $('bootRetry').onclick=()=>location.reload();
   function finishBoot(){if($('bootScreen').hidden){tryAutoLogin();return;}clearTimeout(bootFinishTimer);bootFinishTimer=setTimeout(()=>{if(!ws||ws.readyState!==1||transportLost)return;clearTimeout(bootTimer);$('bootScreen').hidden=true;document.body.classList.remove('booting');document.body.removeAttribute('aria-busy');tryAutoLogin();},Math.max(0,2000-(performance.now()-bootStarted)));}
   const screens = ['login', 'nick', 'lobby', 'game'];
-  function show(name) { screens.forEach(s => $(s).classList.toggle('active', s === name)); cur = name; }
+  function show(name) { if(name!=='game')window.stopSketchGame?.();screens.forEach(s => $(s).classList.toggle('active', s === name)); cur = name; }
   const canvas = $('c'), ctx = canvas.getContext('2d');
 
   let ws, cur = 'login', retryTimer, reconnectAllowed=true, lastReceived=Date.now(), transportLost=false, recovering=false, pauseState=null;
@@ -36,7 +36,7 @@
   function connectionNotice(text) { if($('connectionNotice').textContent!==text)$('connectionNotice').textContent=text;$('connectionNotice').hidden=!text; }
   function lost(socket) {
     if(socket!==ws||!reconnectAllowed)return;
-    socket.onclose=null;socket.close();transportLost=true;recovering=true;connectionNotice('Verbindung unterbrochen · Wiederverbinden …');
+    socket.onclose=null;socket.close();transportLost=true;recovering=true;window.pauseSketchGame?.(true);connectionNotice('Verbindung unterbrochen · Wiederverbinden …');
     clearTimeout(retryTimer);retryTimer=setTimeout(connect,1000);
   }
   function connect() {
@@ -46,6 +46,7 @@
     socket.onmessage=event=>{if(ws!==socket)return;lastReceived=Date.now();handle(JSON.parse(event.data));};
     socket.onclose=()=>lost(socket);socket.onerror=()=>{};
   }
+  window.addEventListener('sketch-command',e=>{if(match?.gid==='sketch'&&!transportLost&&!pauseState?.paused)sendMsg({t:'sketch',mid:match.id,...e.detail});});
   window.addEventListener('round-command',event=>sendMsg(event.detail));
   window.addEventListener('round-exit',()=>{match=null;snap=null;$('overlay').classList.remove('active');show('lobby');sendMsg({t:'lobby'});});
   window.addEventListener('round-notice',event=>toast(event.detail));
@@ -90,9 +91,9 @@
       case 'lobby': lobbyState = m;window.renderRoundFlow?.(m.flow); buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
       case 'challenged': toast(m.nick + ' fordert dich heraus' + (m.gname ? ': ' + m.gname : '')); break;
       case 'match_start': startMatch(m); break;
-      case 'state': snap = m.s; if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;
+      case 'state': snap = m.s;if(match?.gid==='sketch')window.updateSketchGame?.(snap); if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;
       case 'session_moved':lsSet('cw_profile_'+m.code,JSON.stringify({nick:me.nick,tok:lsGet('cw_tok')}));tabCode(m.code);tabRoomPath(null);history.replaceState(null,'','/');location.reload();break;
-      case 'match_pause':pauseState={paused:m.paused,waiting:(m.waiting||[]).map(p=>({...p,until:performance.now()+p.seconds*1000}))};keyMask=touchMask=canvasMask=inputMask=0;break;
+      case 'match_pause':window.pauseSketchGame?.(m.paused);pauseState={paused:m.paused,waiting:(m.waiting||[]).map(p=>({...p,until:performance.now()+p.seconds*1000}))};keyMask=touchMask=canvasMask=inputMask=0;break;
       case 'match_cancelled':pauseState=null;connectionNotice('');match=null;snap=null;$('overlay').classList.remove('active');show('lobby');toast(m.msg);sendMsg({t:'lobby'});break;
       case 'match_end': endMatch(m); break;
       case 'info': toast(m.msg); break;
@@ -145,7 +146,7 @@
     if(selectedGame&&lobbyState?.enabled_games&&!lobbyState.enabled_games.includes(selectedGame))selectedGame=null;
     gamesInfo.filter(g=>!lobbyState?.enabled_games||lobbyState.enabled_games.includes(g.id)).forEach(g => {
       const el = document.createElement('div'); el.className = 'chip'; el.dataset.gid = g.id;
-      el.textContent = g.name + (g.max > 2 ? ' (2-' + g.max + ')' : '');
+      el.textContent = g.name + (g.max > 2 ? ' ('+(g.min||2)+'–'+g.max+')' : '');
       el.onclick = () => { selectedGame = g.id; buildChips(); renderLobby(); };
       if (g.id === selectedGame) el.classList.add('sel');
       box.appendChild(el);
@@ -201,9 +202,9 @@
       const d = document.createElement('div'); d.className = 'challenge-box';
       const list = o.targets.map(t => `<b>${esc(t.nick)}</b> ${t.acc ? '(dabei)' : '(wartet)'}`).join(', ');
       const more = o.max > o.targets.length ? `<br><span class="tag">weitere Gegner möglich: ${o.max - o.targets.length}</span>` : '';
-      d.innerHTML = `<div class="txt">${o.gname ? esc(o.gname) + ': ' : ''}${list}${more}</div>`;
+      d.innerHTML = `<div class="txt">${o.gname ? esc(o.gname) + ': ' : ''}${list}${more}${o.min>2?'<br><span class="tag">Mindestens '+o.min+' Spieler · '+(o.targets.filter(t=>t.acc).length+1)+' bereit</span>':''}</div>`;
       const accN = o.targets.filter(t => t.acc).length;
-      if (accN && accN < o.targets.length)
+      if (accN+1 >= (o.min||2) && (accN < o.targets.length || o.manual))
         d.appendChild(mkBtn('Starten (' + (accN + 1) + ' Spieler)', 'primary mini', () => sendMsg({ t: 'start_now' })));
       d.appendChild(mkBtn('Abbrechen', 'mini', () => sendMsg({ t: 'challenge_cancel' })));
       out.appendChild(d);
@@ -242,7 +243,8 @@
   function startMatch(m) {
     window.clearRoundFlow?.();
     pauseState=null;connectionNotice('');
-    match = { gid: m.game, role: m.role, opp: m.opp };
+    match = { id:m.id,gid: m.game, role: m.role, opp: m.opp,names:m.names||[] };
+    if(m.game==='sketch')window.startSketchGame?.(match);else window.stopSketchGame?.();
     snap = null;
     for (const k in R) delete R[k];
     $('overlay').classList.remove('active');
@@ -256,6 +258,7 @@
     show('game');
   }
   function endMatch(m) {
+    window.pauseSketchGame?.(true);
     pauseState=null;connectionNotice('');
     const big = $('resBig');
     big.className = 'big ' + m.result;
@@ -292,7 +295,7 @@
   function b64bits(str) { const bin = atob(str); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
   const WSHORT = { 'Basic Shell': 'Basic', 'Inferno Blast': 'Inf', 'Shock Charge': 'Shock', 'Golden Dome': 'Dome' };
   window.addEventListener('keydown', e => {
-    if (cur !== 'game') return;
+    if (cur !== 'game'||match?.gid==='sketch'||e.target.closest('input,textarea,select')) return;
     const b = KEYMAP[e.code]; if (b) { e.preventDefault(); keyMask |= b; updateInput(); }
   });
   window.addEventListener('keyup', e => {
@@ -406,7 +409,7 @@
     }
   }
   function loop() {
-    if (cur === 'game' && match && snap) {
+    if (cur === 'game' && match && snap && match.gid!=='sketch') {
       fit();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       try { window.drawGame(match.gid, snap, match.role, ctx, R); } catch (e) { /* ignore frame */ }
