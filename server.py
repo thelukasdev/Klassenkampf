@@ -186,6 +186,7 @@ class Match:
         Match._next_id += 1
         self.gid = gid
         self.players = list(players)      # Rolle = Index + 1, Herausforderer = 1
+        self.account_participants=server.web_admin.player_auth.personal_stats.participants(self.players)
         self.left = set()                 # Spieler, die vorzeitig gegangen sind
         self.game = games.create(gid, len(players))
         if server.worker:
@@ -614,6 +615,7 @@ class Server:
         if m.recorder:m.recorder.finish(m.end_reason)
         if not m.recorded:
             m.recorded=True
+            self.web_admin.player_auth.personal_stats.record(m)
             self.history.append({'id':m.id,'game':m.gid,'name':m.name,'players':[p.nick for p in m.players],
                                  'outcomes':m.outcomes,'reason':m.end_reason,'time':int(time.time()),
                                  'duration':round(time.monotonic()-m.start_t,1),'replay':m.recorder.id if m.recorder else None})
@@ -917,6 +919,7 @@ class Server:
         conn = Conn(writer)
         account=self.web_admin.player_auth.session(headers)
         conn.account_email=account["display_email"] if account else None
+        conn.account_session_token=self.web_admin.cookie(headers,self.web_admin.player_auth.COOKIE) if account else None
         player = None
         recent_messages = deque(maxlen=241)
         await conn.send({"t": "welcome", "games": games.GAME_INFO, "mode": self.mode})

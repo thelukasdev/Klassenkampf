@@ -205,6 +205,7 @@ class WebAdmin:
                 db.execute('DELETE FROM report_messages WHERE report_id IN (SELECT id FROM issue_reports WHERE owner=?)',(identity,))
                 db.execute('DELETE FROM issue_reports WHERE owner=?',(identity,))
                 db.execute('DELETE FROM player_avatars WHERE email=?',(email,))
+                db.execute('DELETE FROM player_stats WHERE email=?',(email,))
                 db.execute('DELETE FROM player_accounts WHERE email=?',(email,))
                 db.execute("DELETE FROM admins WHERE email=? AND role='host'",(identity,))
                 db.execute('DELETE FROM session_access WHERE email=?',(identity,))

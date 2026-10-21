@@ -33,6 +33,11 @@ class PlayerAuth:
                 CREATE TABLE IF NOT EXISTS player_avatars(email TEXT PRIMARY KEY,avatar TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS player_limits(key TEXT PRIMARY KEY,started INTEGER NOT NULL,count INTEGER NOT NULL);
             ''')
+        from player_stats import PlayerStats
+        self.personal_stats=PlayerStats(self.store)
+
+    def stats(self,email):
+        return self.personal_stats.get(email)
 
     def avatar(self,email):
         from avatars import safe_avatar
@@ -201,6 +206,12 @@ class PlayerAuth:
         w=self.web
         if route=='/auth/player/csrf' and method=='GET':
             token=secrets.token_urlsafe(32);await w.respond(writer,200,{'csrf':token,'ready':True,'mail_ready':self.ready},cookie=(self.CSRF,token,600));return
+        if route=='/auth/player/stats':
+            session=self.session(headers)
+            if not session:raise Denied('Bitte erneut anmelden.')
+            if method!='GET':
+                await w.respond(writer,405,{'error':'Methode nicht erlaubt.'});return
+            await w.respond(writer,200,self.stats(session['display_email']));return
         if route=='/auth/player/avatar':
             from avatars import AVATARS
             session=self.session(headers)
