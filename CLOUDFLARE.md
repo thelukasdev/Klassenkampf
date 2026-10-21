@@ -58,3 +58,9 @@ Admin-Anmeldung hat zusätzlich ihr eigenes enges Limit und Authenticator-2FA.
 Änderungen sollten anhand der Cloudflare-Ereignisse bewertet werden, insbesondere
 bei vielen gleichzeitigen Anmeldungen aus einem Schulnetz. Keine Spielverbindungen
 mit einer pauschalen Challenge-Regel unterbrechen.
+
+## Startseite
+
+Die Halloween-Dekoration ist in `static/index.html` und den auf `#login` begrenzten
+Regeln in `static/style.css` enthalten. Sie benötigt keine externen Bilder, Skripte
+oder Animationen und verändert weder Lobby noch Spielfelder.

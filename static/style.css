@@ -15,6 +15,21 @@ body{
   align-items:center;justify-content:center;padding:16px;gap:14px}
 .screen.active{display:flex}
 
+/* Small seasonal treatment, scoped to the session-code screen. */
+#login{background:radial-gradient(ellipse at 50% 48%,#8b47251c,transparent 58%),linear-gradient(160deg,#141020,#0d1014);isolation:isolate}
+#login::before,#login::after{content:"";position:absolute;top:0;width:150px;height:150px;pointer-events:none;opacity:.22;z-index:-1;background:repeating-radial-gradient(circle at 0 0,transparent 0 28px,#bda3c0 29px 30px,transparent 31px 48px);mask-image:linear-gradient(135deg,#000,transparent 75%)}
+#login::before{left:0}#login::after{right:0;transform:scaleX(-1)}
+#login .logo{color:#e7d9f0;text-shadow:0 0 26px #b280d02b}
+#login .logo .w{color:#f2a35e}
+#login .autumn-label{color:#bc9cab;font-size:11px;letter-spacing:3px}
+.autumn-mark{height:56px;filter:drop-shadow(0 6px 18px #df782b30)}
+#login .card{background:linear-gradient(155deg,#231c29,#17161d);border-color:#69432e;box-shadow:0 20px 65px #0007}
+#login .card h2{color:#f2d2ad}
+#login input:focus{border-color:#f2a35e;box-shadow:0 0 0 3px #f2a35e24}
+#login .btn.primary{background:linear-gradient(#b65c29,#84401d);border-color:#e89b57;color:#fff4e8}
+#login .demo-launch{border-color:#4b394d;color:#e6c3a1}
+@media(max-height:620px){#login{gap:9px}.autumn-mark{height:38px}.autumn-mark svg{height:38px}#login .card{padding:16px}}
+
 h1.logo{font-size:clamp(28px,7vw,54px);letter-spacing:4px;margin:0;
   color:var(--head);text-shadow:0 0 18px rgba(120,230,255,.35);font-weight:800}
 h1.logo .w{color:var(--p2)}
