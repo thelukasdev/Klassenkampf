@@ -1,0 +1,16 @@
+services:
+  cloud-metrics:
+    image: klassenkampf-app
+    command: [python, /app/monitoring/cloud_sender.py]
+    restart: unless-stopped
+    mem_limit: 32m
+    cpus: 0.1
+    pids_limit: 16
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./monitoring/cloud_sender.py:/app/monitoring/cloud_sender.py:ro
+      - ${MONITORING_SECRETS_DIR:-../klassenkampf-private/monitoring}/grafana-cloud.json:/run/secrets/grafana-cloud.json:ro
+      - ${MONITORING_SECRETS_DIR:-../klassenkampf-private/monitoring}/status-token:/run/secrets/status-token:ro
+    logging: {driver: json-file, options: {max-size: 2m, max-file: '2'}}

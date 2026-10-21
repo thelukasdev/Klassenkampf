@@ -105,3 +105,7 @@ Beamer-Ansicht mit Live-Partie-Auswahl, Rangliste und widerrufbarer Freigabe: [B
 Zeichnen & Raten für vier bis acht Spieler: [ZEICHNEN-UND-RATEN.md](ZEICHNEN-UND-RATEN.md).
 
 Hinweise zu Auslieferung, Verwaltung, Datenbankindizes und Verbindungsdiagnose: [PERFORMANCE.md](PERFORMANCE.md).
+
+## Grafana Cloud
+
+Optionales Monitoring mit begrenzten technischen Messwerten und einem kleinen Sender: [Einrichtung und Betrieb](monitoring/README.md). Keine lokale Grafana-/Prometheus-Installation erforderlich.
