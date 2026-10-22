@@ -109,3 +109,7 @@ Hinweise zu Auslieferung, Verwaltung, Datenbankindizes und Verbindungsdiagnose: 
 ## Grafana Cloud
 
 Optionales Monitoring mit begrenzten technischen Messwerten und einem kleinen Sender: [Einrichtung und Betrieb](monitoring/README.md). Keine lokale Grafana-/Prometheus-Installation erforderlich.
+
+## Integrations-API
+
+Swagger UI unter /api/docs; Endpunkte, Berechtigungen und Betrieb: [API-Dokumentation](API.md).

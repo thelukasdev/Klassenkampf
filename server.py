@@ -699,6 +699,12 @@ class Server:
             k, _, v = line.decode("latin1").partition(":")
             headers[k.strip().lower()] = v.strip()
 
+        api_path=urlsplit(path).path
+        if api_path.startswith('/api/v1/') or api_path=='/api/openapi.json':
+            if not hasattr(self,'external_api'):
+                from external_api import API
+                self.external_api=API(self,Path(APP_DIR)/'external-api.key')
+            await self.external_api.handle(writer,method,api_path,headers);return
         if urlsplit(path).path=='/internal/metrics':
             token=os.environ.get('KLASSENKAMPF_STATUS_TOKEN','')
             if method!='GET' or not token or not secrets.compare_digest(headers.get('authorization','').encode(),('Bearer '+token).encode()):
@@ -780,6 +786,8 @@ class Server:
         if path in ('/demo','/demo/'):path='/demo.html'
         if path in ('/tickets','/tickets/') or re.fullmatch(r'/tickets/KK-[A-F0-9]{12}/?',path):path='/tickets.html'
         if path in ('/report','/report/'):path='/report.html'
+        if path in ('/api/docs','/api/docs/'):
+            path='/api-docs.html'
         if path in ('/account/security','/account/security/'):
             path='/security.html'
         if path in ('/account/manage','/account/manage/'):

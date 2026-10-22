@@ -1,0 +1,3 @@
+swagger-ui-dist 5.33.3
+Source: https://registry.npmjs.org/swagger-ui-dist/-/swagger-ui-dist-5.33.3.tgz
+Archive SHA256: 43b39460ac8d3136c88b939ebaf70e253284c2a6b2b535fb3b41d0066c4fce72
