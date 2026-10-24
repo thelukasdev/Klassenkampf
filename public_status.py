@@ -201,6 +201,8 @@ def probe(store,target,token,origin,check_public=False):
         ('admin-login','Verwaltungsanmeldung','/auth/password/csrf',False),
     ):
         start=time.monotonic()
+        if payload and payload.get('maintenance') is True and cid=='player-login':
+            logins.append({'id':cid,'label':label,'kind':'service','state':'paused'});continue
         try:
             if http!='operational':raise ValueError('HTTP unavailable')
             with urllib.request.urlopen(target+path,timeout=3) as response:
@@ -212,6 +214,7 @@ def probe(store,target,token,origin,check_public=False):
         logins.append({'id':cid,'label':label,'kind':'service','state':state,
                        'latency_ms':round((time.monotonic()-start)*1000)})
     platform='down' if http=='down' else 'degraded' if ws!='operational' or database!='operational' or any(s['state']=='degraded' for s in sessions) or any(e['state']=='down' for e in edge) or any(c['state']!='operational' for c in logins) else 'operational'
+    if http=='operational' and payload and payload.get('maintenance') is True:platform='paused'
     return [{'id':'platform','label':'Gesamtsystem','kind':'service','state':platform},
             {'id':'http','label':'Spielserver · HTTP','kind':'service','state':http,'latency_ms':latency},
             {'id':'websocket','label':'Spielverbindungen · WebSocket','kind':'service','state':ws},

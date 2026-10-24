@@ -60,6 +60,26 @@ class StatusStoreTests(unittest.TestCase):
         self.assertEqual(states['player-login'],'down');self.assertEqual(states['admin-login'],'down')
         self.assertEqual(states['platform'],'down');self.assertEqual(states['session-one'],'down');self.assertEqual(states['session-old'],'ended')
 
+    def test_maintenance_is_paused_not_a_login_outage(self):
+        class Response:
+            status=200
+            def __init__(self,body):self.body=body
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,*args):return self.body
+        def open_url(url,**kwargs):
+            path=url if isinstance(url,str) else url.full_url
+            if path.endswith('/healthz'):return Response(b'ok')
+            if path.endswith('/internal/status.json'):return Response(b'{"version":1,"database":"operational","sessions":[],"maintenance":true}')
+            if '/auth/player/' in path:raise AssertionError('Player login must not be probed during maintenance')
+            return Response(b'{"csrf":"abcdefghijklmnopqrstuvwxyz0123456789"}')
+        with patch('public_status.urllib.request.urlopen',side_effect=open_url),patch('public_status.websocket_probe',return_value=True):
+            items=probe(self.store,'http://app:8080','secret','https://example.org')
+        states={r['id']:r['state'] for r in items}
+        self.assertEqual(states['platform'],'paused')
+        self.assertEqual(states['player-login'],'paused')
+        self.assertEqual(states['admin-login'],'operational')
+
     def test_public_https_failure_degrades_otherwise_healthy_system(self):
         class Response:
             status=200

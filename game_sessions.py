@@ -62,6 +62,9 @@ class GameSessions:
         return room
 
     def create(self, name, mode='choose',waiting_room=False,design=None):
+        from maintenance import read
+        from server import APP_DIR
+        if read(APP_DIR)['enabled']:raise ValueError('Wartungsmodus: Neue Sitzungen sind vorübergehend gesperrt.')
         from session_design import validate
         design=validate(design)
         if type(waiting_room) is not bool:raise ValueError('Ungültige Warteraum-Einstellung.')

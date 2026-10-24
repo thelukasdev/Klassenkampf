@@ -260,6 +260,10 @@ class WebAdmin:
                     pass
                 elif not (method=='POST' and route=='/api/admin/action'):
                     raise Denied('Für Spielerkonten nicht verfügbar.')
+            if route=='/api/admin/maintenance' and method=='GET':
+                if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Wartungsarbeiten verwalten.')
+                from maintenance import read
+                await self.respond(writer,200,read(Path(self.store.path).parent));return
             if route=='/api/admin/site-theme' and method=='GET':
                 if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen das Seitendesign ändern.')
                 from site_theme import overview
@@ -345,7 +349,18 @@ class WebAdmin:
                 raise ValueError('Ungueltige Anfrage')
             action, value = obj.get('action'), str(obj.get('value',''))
             if session['role']=='host' and not self.player_auth.permissions.permits(self.player_auth.permissions.get(session['email']),action):raise Denied('Diese Aktion ist nicht freigegeben.')
-            if action=='site-theme':
+            if action=='maintenance':
+                if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Wartungsarbeiten verwalten.')
+                from maintenance import save
+                state=save(Path(self.store.path).parent,obj.get('maintenance'))
+                self.store.log(session['email'],action,'enabled' if state['enabled'] else 'disabled')
+                arenas=list(self.server.session_hub.rooms.values()) if self.server.session_hub else [self.server]
+                for arena in arenas:
+                    for player in list(arena.players.values()):
+                        if player.online and player.conn:
+                            await player.conn.send({'t':'maintenance','finish':bool(player.match and not player.match.finished),'enabled':state['enabled'],'msg':state['message']})
+                result='Wartungsmodus aktiviert.' if state['enabled'] else 'Wartungsmodus deaktiviert.'
+            elif action=='site-theme':
                 if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen das Seitendesign ändern.')
                 from site_theme import save
                 save(Path(self.store.path).parent,obj.get('value'))

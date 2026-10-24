@@ -30,7 +30,7 @@
   }
   function render(){
     const platform=data.components.find(c=>c.id==='platform'),state=data.stale?'unknown':platform?.state||'unknown';
-    $('overall').className='overall '+state;$('overallTitle').textContent={operational:'Alle Systeme erreichbar',degraded:'Einzelne Bereiche beeinträchtigt',down:'Spielserver nicht erreichbar',unknown:'Status aktuell nicht verlässlich'}[state]||labels[state];
+    $('overall').className='overall '+state;$('overallTitle').textContent={paused:'Wartungsarbeiten',operational:'Alle Systeme erreichbar',degraded:'Einzelne Bereiche beeinträchtigt',down:'Spielserver nicht erreichbar',unknown:'Status aktuell nicht verlässlich'}[state]||labels[state];
     $('overallText').textContent=data.stale?'Messdaten veraltet.':'';$('overallText').hidden=!data.stale;
     $('updated').textContent=data.checked?'Letzte Prüfung: '+date(data.checked)+' · alle '+data.interval+' s':'Noch keine abgeschlossene Prüfung';
     $('uptime').textContent='Gesamtsystem: '+availability('platform');

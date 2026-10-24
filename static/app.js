@@ -17,6 +17,7 @@
   let clientMode = 'choose';   // 'choose' | 'random' (vom Server)
 
   // Spielzustand
+  let maintenancePending=false;
   let match = null;               // {gid, role, opp}
   let snap = null;
   const R = {};                   // persistenter Render-Zustand
@@ -125,7 +126,8 @@
       case 'session_moved':lsSet('cw_profile_'+m.code,JSON.stringify({nick:me.nick,tok:lsGet('cw_tok')}));tabCode(m.code);tabRoomPath(null);history.replaceState(null,'','/');location.reload();break;
       case 'match_pause':window.pauseSketchGame?.(m.paused);pauseState={paused:m.paused,waiting:(m.waiting||[]).map(p=>({...p,until:performance.now()+p.seconds*1000}))};keyMask=touchMask=canvasMask=inputMask=0;break;
       case 'match_cancelled':pauseState=null;connectionNotice('');match=null;snap=null;$('overlay').classList.remove('active');show('lobby');toast(m.msg);sendMsg({t:'lobby'});break;
-      case 'match_end': endMatch(m); break;
+      case 'maintenance': maintenancePending=m.enabled!==false;if(maintenancePending){if(m.finish)toast(m.msg+' · Deine Partie kann noch beendet werden.');else location.replace('/');}break;
+      case 'match_end': if(maintenancePending){location.replace('/');break;}endMatch(m); break;
       case 'info': toast(m.msg); break;
       case 'err': toast('⚠ ' + m.msg); break;
       case 'kicked':reconnectAllowed=false;clearTimeout(retryTimer);pauseState=null;transportLost=false;connectionNotice('');$('loginErr').textContent=m.msg+' · Bitte Seite neu laden.';show('login');toast(m.msg);break;

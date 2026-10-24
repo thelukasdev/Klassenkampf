@@ -560,6 +560,8 @@ class Server:
         return hit
 
     async def _maybe_start(self, c, force=False):
+        from maintenance import read
+        if read(APP_DIR)['enabled']:return
         """Herausforderung starten, wenn niemand mehr aussteht (oder force)."""
         if self.flow.waiting or self.rules['paused'] or (c.gid and c.gid not in self.rules['enabled']): return
         if c.src.out_challenge is not c or c.src.busy or not c.src.online:
@@ -599,6 +601,8 @@ class Server:
 
     # ----- Matches -----
     def start_match(self, gid, players):
+        from maintenance import read
+        if read(APP_DIR)['enabled']:raise ValueError('Wartungsmodus: Neue Partien sind vorübergehend gesperrt.')
         if self.flow.waiting:raise ValueError('Die Spielleitung hat den Warteraum noch nicht freigegeben.')
         if self.rules['paused'] or gid not in self.rules['enabled']:
             raise ValueError('Dieses Spiel ist pausiert oder nicht freigegeben.')
@@ -705,6 +709,14 @@ class Server:
             headers[k.strip().lower()] = v.strip()
 
         api_path=urlsplit(path).path
+        from maintenance import read as maintenance_read,respond as maintenance_response
+        maintenance_state=maintenance_read(APP_DIR)
+        # Keep administration and assets available; public HTML/API routes are closed.
+        static_asset=Path(api_path).suffix.lower() in ('.css','.js','.svg','.png','.webp','.ico','.woff','.woff2')
+        allowed=api_path in ('/admin','/admin/','/admin.html','/healthz','/status','/status/','/api/status') or api_path.startswith(('/auth/password/','/api/admin/','/internal/','/status/')) or api_path=='/auth/logout' or static_asset
+        if maintenance_state['enabled'] and not allowed and headers.get('upgrade','').lower()!='websocket':
+            await maintenance_response(writer,method,maintenance_state);return
+
         if api_path.startswith('/api/v1/') or api_path=='/api/openapi.json':
             if not hasattr(self,'external_api'):
                 from external_api import API
@@ -996,6 +1008,15 @@ class Server:
         if self.session_hub:
             return await self.session_hub.message(conn, player, obj)
         t = obj.get("t")
+        from maintenance import read
+        maintenance=read(APP_DIR)
+        if maintenance['enabled']:
+            # Permit a proven participant to reconnect to their ongoing match.
+            returning=self.players.get(nick_key(str(obj.get('nick','')))) if t=='login' else None
+            valid_return=bool(returning and returning.match and not returning.match.finished and returning.token_hash and secrets.compare_digest(hashlib.sha256(str(obj.get('tok','')).encode()).hexdigest(),returning.token_hash))
+            if valid_return:await conn.send({'t':'maintenance','finish':True,'msg':maintenance['message']})
+            if (t in ('login','nick') and not valid_return) or (player and not player.busy) or t in ('challenge','accept','start_now','ready','round_vote','rematch'):
+                await conn.send({'t':'maintenance','finish':False,'msg':maintenance['message']});return player
 
         if t == "login":
             now = time.monotonic()

@@ -1,4 +1,5 @@
 """Explicit allowlist for the private monitoring feed; no game state is serialized."""
+from pathlib import Path
 import hashlib
 import time
 
@@ -24,4 +25,5 @@ def snapshot(server):
             sessions.append({'id':'session-'+public_id,'label':'Sitzung '+public_id[:6].upper(),
                              'kind':'session','state':state,'online':row['online'],
                              'matches':row['matches'],'active':row['active']})
-    return {'version':1,'database':'operational','sessions':sessions}
+    from maintenance import read
+    return {'version':1,'database':'operational','sessions':sessions,'maintenance':read(Path(server.web_admin.store.path).parent)['enabled']}
