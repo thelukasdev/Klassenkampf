@@ -172,13 +172,18 @@
   };
 
   // ---------------- Lobby ----------------
+  let chipKey='';
   function buildChips() {
-    const box = $('gameChips'); box.innerHTML = '';
+    const box = $('gameChips');
     if(selectedGame&&lobbyState?.enabled_games&&!lobbyState.enabled_games.includes(selectedGame))selectedGame=null;
+    const nextKey=JSON.stringify([gamesInfo,lobbyState?.enabled_games,selectedGame]);if(chipKey===nextKey)return;chipKey=nextKey;box.replaceChildren();
     gamesInfo.filter(g=>!lobbyState?.enabled_games||lobbyState.enabled_games.includes(g.id)).forEach(g => {
-      const el = document.createElement('div'); el.className = 'chip'; el.dataset.gid = g.id;
-      el.textContent = g.name + (g.max > 2 ? ' ('+(g.min||2)+'–'+g.max+')' : '');
-      el.onclick = () => { selectedGame = g.id; buildChips(); renderLobby(); };
+      const el = document.createElement('button'); el.type='button';el.className = 'chip game-card'; el.dataset.gid = g.id;
+      const image=document.createElement('img');image.src=g.preview||'/lp-icon.png';image.alt='';image.width=240;image.height=120;image.loading='lazy';
+      const title=document.createElement('strong');title.textContent=g.name;
+      const meta=document.createElement('span');meta.textContent=(g.min===g.max?g.min:(g.min||2)+'–'+g.max)+' Spieler · ca. '+(g.duration||'2–5 Min.');
+      el.append(image,title,meta);el.setAttribute('aria-pressed',String(g.id===selectedGame));
+      el.onclick = () => { selectedGame = g.id; buildChips(); renderLobby();[...box.children].find(node=>node.dataset.gid===g.id)?.focus(); };
       if (g.id === selectedGame) el.classList.add('sel');
       box.appendChild(el);
     });
