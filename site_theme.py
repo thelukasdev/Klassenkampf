@@ -41,7 +41,7 @@ def stylesheet(data_dir):
     name,icon,label,bg,glow,panel,accent,link=THEMES[key]
     if key=='newyear':return NEWYEAR_CSS.encode('utf-8')
     css = f"""/* Public template: {key} */
-.season-fireworks,.season-christmas{{display:none}}
+.season-fireworks,.season-christmas,.season-scenery{{display:none}}
 #login,body.public-theme{{--theme-bg:{bg};--theme-glow:{glow};--theme-panel:{panel};--theme-accent:{accent};--theme-link:{link};}}
 #login{{background:radial-gradient(ellipse at 50% 0,var(--theme-glow),var(--theme-bg) 75%);}}
 #login::before,#login::after{{display:none}}
@@ -62,12 +62,13 @@ body.public-theme .brand::after{{content:'{icon}';font-size:24px}}
 """
     if key=='default':css+='#login .season-mark,#login .season-label{display:none}\n'
     if key=='christmas':css+=CHRISTMAS_CSS
+    elif key in SCENERY:css+=scenery_css(key,bg,glow)
     return css.encode('utf-8')
 
 
 # Decorative only: leave the existing page colors, typography and controls intact.
 NEWYEAR_CSS = """/* Public template: newyear */
-.season-christmas{display:none}
+.season-christmas,.season-scenery{display:none}
 .season-fireworks{display:none;position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
 body:has(#login.active)>.season-fireworks,body.public-theme>.season-fireworks{display:block}
 #login{isolation:isolate;background:transparent}
@@ -103,3 +104,47 @@ body.public-theme>header,body.public-theme>main,body.public-theme>footer{positio
 @media(prefers-reduced-motion:reduce){.season-christmas .snow{display:none}.season-christmas .santa{animation:none;left:auto;right:18px;width:160px;opacity:.55}}
 html.season-paused .season-christmas *,html.season-paused .season-fireworks *::before,html.season-paused .season-fireworks *::after{animation-play-state:paused}
 """
+
+
+SCENERY = {
+    'default': ('•', '•', '•', '#a8e7ba', 'season-glimmer', '22s'),
+    'halloween': ('🦇', '🦇', '✦', '#c6afdc', 'season-drift', '29s'),
+    'easter': ('🥚', '✿', '❀', '#e0c7eb', 'season-float', '33s'),
+    'summer': ('☁', '🦋', '☁', '#f0e4c3', 'season-drift', '38s'),
+    'autumn': ('🍂', '🍁', '🍃', '#e5b373', 'season-leaves', '24s'),
+    'winter': ('❄', '·', '✧', '#d4eafa', 'season-leaves', '31s'),
+}
+
+def scenery_css(key,bg,glow):
+    first,second,third,color,movement,duration=SCENERY[key]
+    css=f"""
+/* Scenery: {key}; all decoration stays behind the page controls. */
+body:has(#login.active)>.season-scenery,body.public-theme>.season-scenery{{display:block}}
+.season-scenery{{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;color:{color}}}
+body:has(#login.active){{background:radial-gradient(ellipse at 50% 0,{glow},{bg} 75%)}}
+#login{{background:transparent;isolation:isolate;z-index:1}}
+body.public-theme>header,body.public-theme>main,body.public-theme>footer{{position:relative;z-index:1}}
+.season-scenery i{{position:absolute;left:var(--x);top:-60px;font-style:normal;font-size:var(--size);opacity:0;animation:{movement} {duration} linear infinite;animation-delay:var(--wait);transition:margin-left 2s ease}}
+.season-scenery i::before{{content:'{first}'}}
+.season-scenery i:nth-child(3n+2)::before{{content:'{second}'}}
+.season-scenery i:nth-child(3n)::before{{content:'{third}'}}
+.season-scenery.wind-left i{{margin-left:-24px}}.season-scenery.wind-right i{{margin-left:24px}}
+@keyframes season-leaves{{0%{{opacity:0;transform:translate3d(0,-30px,0) rotate(0)}}10%{{opacity:.35}}50%{{transform:translate3d(45px,55vh,0) rotate(160deg)}}90%{{opacity:.3}}100%{{opacity:0;transform:translate3d(-30px,115vh,0) rotate(330deg)}}}}
+@keyframes season-float{{0%{{opacity:0;transform:translate3d(0,110vh,0) rotate(-12deg)}}15%,75%{{opacity:.25}}100%{{opacity:0;transform:translate3d(30px,5vh,0) rotate(18deg)}}}}
+@keyframes season-drift{{0%{{opacity:0;transform:translate3d(-15vw,30vh,0)}}15%,75%{{opacity:.22}}50%{{transform:translate3d(25vw,22vh,0) rotate(-7deg)}}100%{{opacity:0;transform:translate3d(65vw,32vh,0)}}}}
+@keyframes season-glimmer{{0%,100%{{opacity:0;transform:translate3d(0,90vh,0)}}30%,65%{{opacity:.24}}99%{{transform:translate3d(25px,0,0)}}}}
+html.season-paused .season-scenery *,html.season-paused .season-scenery::after{{animation-play-state:paused}}
+@media(prefers-reduced-motion:reduce){{.season-scenery{{display:none!important}}}}
+"""
+    for n in range(1,13):
+        size=5+(n%3)*3 if key=='default' else 10+(n%4)*6
+        css+=f'.season-scenery i:nth-child({n}){{--x:{(n*29)%100}%;--wait:-{n*3.7:.1f}s;--size:{size}px;}}\n'
+    if key=='halloween':
+        css+=".season-scenery::before{content:'';position:absolute;right:9%;top:12%;width:64px;height:64px;border-radius:50%;background:#d8d0ad;opacity:.13;box-shadow:0 0 70px 20px #c7b69322}.season-scenery::after{content:'';position:absolute;bottom:-15%;left:-20%;width:140%;height:40%;background:radial-gradient(ellipse,#a18aaf15,transparent 65%);animation:season-mist 24s ease-in-out infinite alternate}@keyframes season-mist{to{transform:translate3d(8%, -12px,0)}}"
+    elif key=='summer':
+        css+=".season-scenery::after{content:'☀';position:absolute;right:8%;top:12%;font-size:70px;line-height:1;color:#f1c36d;opacity:.22;animation:season-sun 80s linear infinite}@keyframes season-sun{to{transform:rotate(360deg)}}"
+    elif key=='easter':
+        css+=".season-scenery::after{content:'✿　❀　✿';position:absolute;bottom:6%;left:5%;font-size:27px;letter-spacing:12px;opacity:.15}"
+    elif key=='winter':
+        css+=".season-scenery::after{content:'';position:absolute;bottom:-24px;left:-5%;width:110%;height:70px;border-radius:50% 50% 0 0;background:#c6e3f3;opacity:.05}"
+    return css

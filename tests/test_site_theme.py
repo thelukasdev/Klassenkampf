@@ -43,6 +43,17 @@ class ThemeStorageTests(unittest.TestCase):
             save(root,'default')
             self.assertNotIn('@keyframes season-sleigh',stylesheet(root).decode())
 
+    def test_remaining_templates_have_scoped_lightweight_scenery(self):
+        with tempfile.TemporaryDirectory() as root:
+            for key in ('default','halloween','easter','summer','autumn','winter'):
+                save(root,key);css=stylesheet(root).decode()
+                self.assertIn('Scenery: '+key,css)
+                self.assertIn('pointer-events:none',css)
+                self.assertIn('prefers-reduced-motion',css)
+                self.assertIn('season-paused',css)
+                self.assertNotIn('#lobby',css)
+                self.assertNotIn('url(https:',css)
+
 class ThemeAccessTests(unittest.IsolatedAsyncioTestCase):
     asyncSetUp=Base.asyncSetUp
     asyncTearDown=Base.asyncTearDown
