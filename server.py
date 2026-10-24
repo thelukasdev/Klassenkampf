@@ -406,6 +406,8 @@ class Server:
         self.game_stats = {}
         self.rules={'enabled':list(games.GAMES),'paused':False,'speed':1,'waiting_room':False,'waiting_released':False,
                     'credits_win':CREDIT_WIN,'credits_loss':CREDIT_LOSS,'credits_draw':CREDIT_DRAW}
+        from session_design import DEFAULT
+        self.design=dict(DEFAULT)
         self.history=[]
         from round_flow import RoundFlow
         self.flow=RoundFlow(self)
@@ -449,7 +451,7 @@ class Server:
     def _state_dict(self):
         return {"players": {p.nick: p.to_dict() for p in self.players.values()},
                 "banned": sorted(self.banned),
-                "mode": self.mode,"rules":self.rules,"history":self.history,"registry":list(games.GAMES)}
+                "mode": self.mode,"rules":self.rules,"design":self.design,"history":self.history,"registry":list(games.GAMES)}
 
     def save(self):
         if self.hub:
@@ -463,6 +465,9 @@ class Server:
 
     def _apply_state(self, data):
         """Zustand aus einem dict uebernehmen (Spieler/Credits/Bann/Modus)."""
+        from session_design import validate
+        try:self.design=validate(data.get('design'))
+        except ValueError:self.design=validate(None)
         previous=set(data.get('registry',set(games.GAMES)-{'sketch'}))
         self.rules.update(data.get('rules',{}))
         if set(self.rules['enabled'])==previous:
@@ -526,7 +531,7 @@ class Server:
                    "targets": [{"pid": q, "nick": self.by_pid[q].nick, "acc": st == "accepted"}
                                for q, st in c.targets.items() if q in self.by_pid]}
         return {"t": "lobby", "players": players, "incoming": incoming,
-                "session_name":getattr(self,'room_name',None),
+                "session_name":getattr(self,'room_name',None),"design":self.design,
                 "watch":[{'name':m.name,'players':[p.nick for p in m.players],'url':'/watch#'+m.spectator_token} for m in self.matches.values() if m.spectator_token],
                 "flow":self.flow.view(me),"outgoing": out, "mode": self.mode,"enabled_games":self.rules['enabled'],"paused":self.rules['paused'],
                 "you": {"nick": me.nick, "credits": me.credits,
@@ -1003,7 +1008,7 @@ class Server:
                 return player
             conn.authed = True
             await conn.send({"t": "login_ok", "code": code, "auto": bool(obj.get("nick")),
-                             "session":self.room_id,"room_path":self.room_path,"session_name":getattr(self,'room_name',None),"mode":self.mode})
+                             "session":self.room_id,"room_path":self.room_path,"session_name":getattr(self,'room_name',None),"design":self.design,"mode":self.mode})
             if obj.get("nick"):                 # Wiederverbinden nach Neuladen
                 return await self._claim(conn, player, obj)
             return player

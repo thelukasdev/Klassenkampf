@@ -61,7 +61,9 @@ class GameSessions:
             self.rooms[room_id] = room
         return room
 
-    def create(self, name, mode='choose',waiting_room=False):
+    def create(self, name, mode='choose',waiting_room=False,design=None):
+        from session_design import validate
+        design=validate(design)
         if type(waiting_room) is not bool:raise ValueError('Ungültige Warteraum-Einstellung.')
         name = ' '.join(str(name).split())
         if not name or len(name)>80 or any(ord(c)<32 for c in name):
@@ -77,7 +79,7 @@ class GameSessions:
                 if not db.execute('SELECT 1 FROM game_rooms WHERE code=?',(code,)).fetchone():
                     break
             room_id=secrets.token_hex(12)
-            state={'players':{},'banned':[],'mode':mode,'rules':{'waiting_room':waiting_room,'waiting_released':False}}
+            state={'players':{},'banned':[],'mode':mode,'design':design,'rules':{'waiting_room':waiting_room,'waiting_released':False}}
             db.execute('INSERT INTO game_rooms VALUES(?,?,?,?,?,NULL,?)',
                        (room_id,name,code,1,int(time.time()),json.dumps(state)))
         self.get(room_id)
@@ -155,7 +157,7 @@ class GameSessions:
     async def action(self,obj):
         action=obj.get('action')
         if action=='create-session':
-            return self.create(obj.get('value',''),obj.get('mode','choose'),obj.get('waiting_room',False))
+            return self.create(obj.get('value',''),obj.get('mode','choose'),obj.get('waiting_room',False),obj.get('design'))
         if action=='sessions':
             return self.summaries()
         room_id=str(obj.get('session',''))
@@ -170,6 +172,16 @@ class GameSessions:
         room=self.get(room_id)
         if not room.room_active and action not in ('status','saves'):
             raise ValueError('Beendete Spielsitzungen koennen nicht veraendert werden.')
+        if action=='session-design':
+            from session_design import validate,name
+            design=validate(obj.get('design'));title=name(obj.get('value'))
+            room.design=design;room.room_name=title
+            with self.store.connect() as db:db.execute('UPDATE game_rooms SET name=? WHERE id=?',(title,room_id))
+            room.save()
+            for conn in list(room.joined_connections):
+                if conn.alive and conn.authed:await conn.send({'t':'session-design','session_name':title,'design':design})
+            await room.push_lobby()
+            return 'Sitzungsdesign gespeichert.'
         return await room.admin_action(obj)
 
     def overview(self,room_id='',allowed=None):
@@ -181,7 +193,7 @@ class GameSessions:
             room=self.get(rows[0]['id'])
         return {'sessions':rows,'selected_session':room.room_id if room else None,
                 'session_active':room.room_active if room else False,
-                'session_name':room.room_name if room else None,
+                'session_name':room.room_name if room else None,'design':room.design if room else {},
                 'status':{'mode':room.mode if room else 'choose','players':room.admin_list() if room else [],
                           'matches':len(room.matches) if room else 0,'connections':len(room.joined_connections) if room else 0},
                 'code':room.login_code if room and room.room_active else None,

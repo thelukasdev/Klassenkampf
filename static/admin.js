@@ -3,6 +3,7 @@
   const playerPanel=location.pathname.startsWith('/account');
   const $ = id => document.getElementById(id);
   let user = null, snapshot = null, busy = false, toastTimer, selectedSession = '', accessMode = 'add-admin', loginCsrf = '';
+  let designRoom='';
   const titles = {
     news:['Neuigkeiten','Neuigkeiten','Neue Spiele und Funktionen auf einen Blick.'],
     sessions: ['Spielsitzungen', 'Spielsitzungen', 'Starte parallele Sitzungen mit eigenem Code und eigener Rangliste.'],
@@ -17,7 +18,7 @@
     access: ['Zugriffsverwaltung', 'Zugriffsverwaltung', 'Bestimme, wer die Arena mit dir verwalten darf.'],
     activity: ['Aktivitäten', 'Aktivitäten', 'Sieh nach, wer zuletzt etwas verwaltet hat.']
   };
-  const labels = {'projector':'Beamer-Anzeige geändert','reply-report':'Ticket beantwortet','share-replay':'Replay-Link erstellt','revoke-replay':'Replay-Freigabe beendet','resolve-report':'Fehlermeldung bearbeitet','player-password-change':'Spielerpasswort geändert','player-permissions':'Spielerrechte geändert','delete-player-account':'Spielerkonto gelöscht','revoke-player-logins':'Spielerkonto abgemeldet','player-password-reset':'Spielerpasswort zurückgesetzt','auto-end-session':'Leere Sitzung beendet','player-login':'Spielerkonto angemeldet',login:'Anmeldung',kick:'Spieler getrennt',ban:'Spieler gesperrt',unban:'Spieler entsperrt',
+  const labels = {'session-design':'Sitzungsdesign geändert','projector':'Beamer-Anzeige geändert','reply-report':'Ticket beantwortet','share-replay':'Replay-Link erstellt','revoke-replay':'Replay-Freigabe beendet','resolve-report':'Fehlermeldung bearbeitet','player-password-change':'Spielerpasswort geändert','player-permissions':'Spielerrechte geändert','delete-player-account':'Spielerkonto gelöscht','revoke-player-logins':'Spielerkonto abgemeldet','player-password-reset':'Spielerpasswort zurückgesetzt','auto-end-session':'Leere Sitzung beendet','player-login':'Spielerkonto angemeldet',login:'Anmeldung',kick:'Spieler getrennt',ban:'Spieler gesperrt',unban:'Spieler entsperrt',
     'reset-credits':'Credits zurückgesetzt',mode:'Spielmodus geändert',save:'Spielstand gesichert',load:'Spielstand geladen',
     'add-admin':'Zugriff freigegeben','remove-admin':'Zugriff entfernt','reset-admin-password':'Passwort geändert',
     rules:'Regeln geändert','pause-match':'Partie pausiert / fortgesetzt','spectators':'Zuschauerfreigabe geändert','end-match':'Partie ohne Wertung beendet','move-player':'Spieler zugeordnet','remove-player':'Spieler entfernt',role:'Rolle geändert','assign-session':'Sitzungszugriff geändert',
@@ -86,6 +87,9 @@
   function renderControls(){
     const sessions=snapshot.sessions||[],server=snapshot.server||{},rules=snapshot.rules||{};
     renderProjector();
+    if(designRoom!==snapshot.selected_session){designRoom=snapshot.selected_session;$('designName').value=snapshot.session_name||'';$('designAccent').value=snapshot.design?.accent||'#73d363';$('designBackground').value=snapshot.design?.background||'#0a0d0a';updateDesignPreview();}
+    $('sessionDesignForm').querySelectorAll('input,button').forEach(n=>n.disabled=!snapshot.session_active);
+
     const waiting=snapshot.flow||{};$('waitingPanel').hidden=!waiting.waiting;$('waitingSummary').textContent=(waiting.ready||0)+' / '+(waiting.online||0)+' Spieler bereit';$('waitingRelease').disabled=!waiting.can_release;
     $('globalStats').replaceChildren(...[`${sessions.filter(s=>s.active).length} aktive Sitzungen`,`${sessions.reduce((a,s)=>a+s.online,0)} Spieler online`,`${sessions.reduce((a,s)=>a+s.matches,0)} laufende Partien`].map(t=>el('span',t)));
     if(!document.querySelector('#rulesForm:focus-within')){
@@ -171,7 +175,10 @@
   document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.goto)));
   $('refresh').addEventListener('click',async()=>{await refresh();if(activeTab==='accounts')await loadAccounts();if(activeTab==='reports')await loadReports();});$('playerSearch').addEventListener('input',filterPlayers);
   $('sessionSelect').addEventListener('change',()=>{selectedSession=$('sessionSelect').value;refresh();});
-  $('sessionForm').addEventListener('submit',async event=>{event.preventDefault();await action('create-session',$('sessionName').value.trim(),null,null,{waiting_room:$('sessionWaiting').checked});});
+  function updateDesignPreview(){const p=$('designPreview');p.textContent=$('designName').value||'Veranstaltung';p.style.background=$('designBackground').value;p.style.borderColor=$('designAccent').value;}
+  $('sessionDesignForm').oninput=updateDesignPreview;
+  $('sessionDesignForm').onsubmit=async e=>{e.preventDefault();designRoom='';await action('session-design',$('designName').value,null,null,{design:{accent:$('designAccent').value,background:$('designBackground').value}});};
+  $('sessionForm').addEventListener('submit',async event=>{event.preventDefault();await action('create-session',$('sessionName').value.trim(),null,null,{waiting_room:$('sessionWaiting').checked,design:{accent:$('sessionAccent').value,background:$('sessionBackground').value}});});
   document.querySelectorAll('[name=mode]').forEach(b=>b.addEventListener('change',()=>action('mode',b.value)));
   $('saveForm').addEventListener('submit',async event=>{event.preventDefault();const value=$('saveName').value.trim();await action('save',value,snapshot.saves.includes(value)?['Sicherung überschreiben?',`„${value}“ wird durch den aktuellen Stand ersetzt.`]:null);});
   $('accessForm').addEventListener('submit',async event=>{event.preventDefault();const saved=await action(accessMode,$('adminEmail').value.trim(),null,null,{password:$('adminPassword').value,role:$('adminRole').value});if(!saved)return;$('adminPassword').value='';accessMode='add-admin';document.querySelector('#accessForm button[type=submit]').textContent='Person freischalten';});

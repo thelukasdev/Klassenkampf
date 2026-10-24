@@ -61,5 +61,5 @@ class HostSessions:
         room=self.hub.rooms.get(row['id']);online=self.online(room) if room else 0
         policy=self.hub.server.web_admin.player_auth.permissions.get(email)
         deadline=None if online or policy['keep_empty'] else row['created']+300 if not row['joined'] else (row['empty_since'] or int(time.time()))+60
-        return {'session':{'id':row['id'],'name':row['name'],'code':row['code'],'online':online,
+        return {'session':{'id':row['id'],'name':row['name'],'design':room.design if room else {},'code':row['code'],'online':online,
                            'flow':room.flow.summary() if room else {},'matches':len(room.matches) if room else 0,'closes_at':deadline}}

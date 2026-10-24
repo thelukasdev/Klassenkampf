@@ -77,6 +77,18 @@
     }else if(reconnectAllowed)connectionNotice('');
   },200);
 
+  function applySessionDesign(m){
+    $('sessionLabel').textContent=m.session_name||'';
+    const d=m.design||{},valid=v=>/^#[a-f0-9]{6}$/i.test(v||'');
+    if(!valid(d.accent)||!valid(d.background))return;
+    const rgb=[1,3,5].map(i=>parseInt(d.accent.slice(i,i+2),16));
+    const luminance=values=>values.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+    const background=luminance([1,3,5].map(i=>parseInt(d.background.slice(i,i+2),16)));
+    let light=rgb;while((luminance(light)+.05)/(background+.05)<4.5&&light.some(v=>v<255))light=light.map(v=>Math.min(255,v+8));
+    const accent='rgb('+light.join(',')+')',lobby=$('lobby');
+    lobby.style.setProperty('--head',accent);lobby.style.setProperty('--accent',accent);lobby.style.setProperty('--p1',accent);
+    lobby.style.background=d.background;lobby.style.setProperty('--design-accent',d.accent);
+  }
   function handle(m) {
     switch (m.t) {
       case 'pong': break;
@@ -88,7 +100,7 @@
         if(/^\/raum\/[a-f0-9]{64}$/.test(m.room_path||'')){tabRoomPath(m.room_path);history.replaceState(null,'',m.room_path);}
         const profile = savedProfile(m.code);
         $('nickInput').value = profile.nick || lsGet('cw_nick') || '';
-        $('sessionLabel').textContent = m.session_name || '';
+        applySessionDesign(m);
         if (m.mode) { clientMode = m.mode; buildChips(); }
         $('nickErr').textContent = '';
         if (!m.auto) { show('nick'); setTimeout(() => $('nickInput').focus(), 50); }
@@ -105,7 +117,8 @@
         lsDel('cw_code'); tabCode(null);tabRoomPath(null);history.replaceState(null,'','/'); me.code = null; me.nick = null;me.tok=null;
         $('loginErr').textContent = m.msg; show('login');
         break;
-      case 'lobby': lobbyState = m;window.renderRoundFlow?.(m.flow); buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
+      case 'session-design':applySessionDesign(m);break;
+      case 'lobby': applySessionDesign(m);lobbyState = m;window.renderRoundFlow?.(m.flow); buildChips(); if (m.mode) clientMode = m.mode; me.nick = m.you.nick; me.credits = m.you.credits; renderLobby(); if (cur !== 'game') show('lobby'); break;
       case 'challenged': toast(m.nick + ' fordert dich heraus' + (m.gname ? ': ' + m.gname : '')); break;
       case 'match_start': startMatch(m); break;
       case 'state': snap = m.s;if(match?.gid==='sketch')window.updateSketchGame?.(snap); if (snap.grid) R.tgrid = b64bits(snap.grid); pumpTouchDrivers(); break;

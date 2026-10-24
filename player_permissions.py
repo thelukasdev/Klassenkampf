@@ -53,4 +53,4 @@ class PlayerPermissions:
     @staticmethod
     def permits(policy, action):
         if action=='projector':return bool(policy.get('manage_games') and policy.get('view_results'))
-        return action in ('create-session', 'end-session','release-waiting-room') or bool(policy.get(ACTIONS.get(action, ''), False))
+        return action in ('create-session', 'end-session','release-waiting-room','session-design') or bool(policy.get(ACTIONS.get(action, ''), False))
