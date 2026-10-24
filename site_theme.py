@@ -41,7 +41,7 @@ def stylesheet(data_dir):
     name,icon,label,bg,glow,panel,accent,link=THEMES[key]
     if key=='newyear':return NEWYEAR_CSS.encode('utf-8')
     css = f"""/* Public template: {key} */
-.season-fireworks{{display:none}}
+.season-fireworks,.season-christmas{{display:none}}
 #login,body.public-theme{{--theme-bg:{bg};--theme-glow:{glow};--theme-panel:{panel};--theme-accent:{accent};--theme-link:{link};}}
 #login{{background:radial-gradient(ellipse at 50% 0,var(--theme-glow),var(--theme-bg) 75%);}}
 #login::before,#login::after{{display:none}}
@@ -61,11 +61,13 @@ body.public-theme .brand::after{{content:'{icon}';font-size:24px}}
 @media(max-height:620px){{#login .season-mark{{height:34px;line-height:34px;font-size:30px}}}}
 """
     if key=='default':css+='#login .season-mark,#login .season-label{display:none}\n'
+    if key=='christmas':css+=CHRISTMAS_CSS
     return css.encode('utf-8')
 
 
 # Decorative only: leave the existing page colors, typography and controls intact.
 NEWYEAR_CSS = """/* Public template: newyear */
+.season-christmas{display:none}
 .season-fireworks{display:none;position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
 body:has(#login.active)>.season-fireworks,body.public-theme>.season-fireworks{display:block}
 #login{isolation:isolate;background:transparent}
@@ -80,4 +82,24 @@ body.public-theme>header,body.public-theme>main,body.public-theme>footer{positio
 @keyframes season-launch{0%{opacity:0;transform:translateY(90vh)}3%{opacity:.5}18%{opacity:.65;transform:translateY(0)}19%,100%{opacity:0;transform:translateY(0)}}
 @keyframes season-burst{0%,18%{opacity:0;transform:scale(.08)}20%{opacity:.55;transform:scale(.15)}36%{opacity:.35;transform:scale(1.25) translateY(8px)}48%,100%{opacity:0;transform:scale(1.6) translateY(20px)}}
 @media(prefers-reduced-motion:reduce){.season-fireworks{display:none!important}}
+"""
+
+
+CHRISTMAS_CSS = """
+/* Quiet animated scenery, behind public-page content only. */
+body:has(#login.active)>.season-christmas,body.public-theme>.season-christmas{display:block}
+.season-christmas{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+body:has(#login.active){background:radial-gradient(ellipse at 50% 0,#163c2b,#091511 75%)}
+#login{isolation:isolate;background:transparent;z-index:1}
+body.public-theme>header,body.public-theme>main,body.public-theme>footer{position:relative;z-index:1}
+.season-christmas .snow{position:absolute;inset:-220px -60px 0;opacity:.38;background-image:radial-gradient(circle at 25px 25px,#fff 0 1px,transparent 2px),radial-gradient(circle at 119px 83px,#dcebf0 0 1.5px,transparent 2.5px),radial-gradient(circle at 68px 160px,#fff 0 1px,transparent 2px);background-size:180px 220px;animation:season-snow 16s linear infinite;transition:margin-left 2s ease}
+.season-christmas .snow:nth-child(2){opacity:.24;background-size:240px 220px;animation-duration:23s;animation-delay:-10s;filter:blur(.5px)}
+.season-christmas .snow:nth-child(3){opacity:.3;background-size:330px 220px;animation-duration:11s;animation-delay:-4s}
+.season-christmas.wind-left .snow{margin-left:-35px}.season-christmas.wind-right .snow{margin-left:35px}
+.season-christmas .santa{position:absolute;top:9%;left:0;width:clamp(230px,32vw,440px);height:auto;animation:season-sleigh 32s linear infinite;filter:drop-shadow(0 2px 8px #0005)}
+@keyframes season-snow{from{transform:translate3d(0,0,0)}to{transform:translate3d(25px,220px,0)}}
+@keyframes season-sleigh{0%{transform:translate3d(105vw,5px,0) rotate(-3deg)}45%{transform:translate3d(28vw,-12px,0) rotate(2deg)}82%,100%{transform:translate3d(-470px,8px,0) rotate(-3deg)}}
+@media(max-width:600px){.season-christmas .santa{top:12%;animation-duration:26s}}
+@media(prefers-reduced-motion:reduce){.season-christmas .snow{display:none}.season-christmas .santa{animation:none;left:auto;right:18px;width:160px;opacity:.55}}
+html.season-paused .season-christmas *,html.season-paused .season-fireworks *::before,html.season-paused .season-fireworks *::after{animation-play-state:paused}
 """

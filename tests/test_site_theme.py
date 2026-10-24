@@ -33,6 +33,16 @@ class ThemeStorageTests(unittest.TestCase):
             self.assertNotIn('.btn',css)
             self.assertNotIn('.card',css)
 
+    def test_christmas_has_sleigh_snow_and_motion_fallback(self):
+        with tempfile.TemporaryDirectory() as root:
+            save(root,'christmas');css=stylesheet(root).decode()
+            self.assertIn('season-sleigh',css)
+            self.assertIn('season-snow',css)
+            self.assertIn('prefers-reduced-motion',css)
+            self.assertIn('wind-left',css)
+            save(root,'default')
+            self.assertNotIn('@keyframes season-sleigh',stylesheet(root).decode())
+
 class ThemeAccessTests(unittest.IsolatedAsyncioTestCase):
     asyncSetUp=Base.asyncSetUp
     asyncTearDown=Base.asyncTearDown
