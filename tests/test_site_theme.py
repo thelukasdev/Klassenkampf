@@ -22,6 +22,17 @@ class ThemeStorageTests(unittest.TestCase):
             (Path(root)/'site-theme.json').write_text('broken')
             self.assertEqual(current(root),'halloween')
 
+    def test_newyear_is_decoration_only_and_respects_reduced_motion(self):
+        with tempfile.TemporaryDirectory() as root:
+            save(root,'newyear');css=stylesheet(root).decode()
+            self.assertIn('season-launch',css)
+            self.assertIn('season-burst',css)
+            self.assertIn('prefers-reduced-motion',css)
+            self.assertIn('pointer-events:none',css)
+            self.assertNotIn('--theme-accent',css)
+            self.assertNotIn('.btn',css)
+            self.assertNotIn('.card',css)
+
 class ThemeAccessTests(unittest.IsolatedAsyncioTestCase):
     asyncSetUp=Base.asyncSetUp
     asyncTearDown=Base.asyncTearDown
