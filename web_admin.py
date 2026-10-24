@@ -260,6 +260,10 @@ class WebAdmin:
                     pass
                 elif not (method=='POST' and route=='/api/admin/action'):
                     raise Denied('Für Spielerkonten nicht verfügbar.')
+            if route=='/api/admin/site-theme' and method=='GET':
+                if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen das Seitendesign ändern.')
+                from site_theme import overview
+                await self.respond(writer,200,overview(Path(self.store.path).parent));return
             if route=='/api/admin/report' and method=='GET':
                 if session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen Tickets sehen.')
                 query=parse_qs(urlsplit(path).query)
@@ -341,7 +345,13 @@ class WebAdmin:
                 raise ValueError('Ungueltige Anfrage')
             action, value = obj.get('action'), str(obj.get('value',''))
             if session['role']=='host' and not self.player_auth.permissions.permits(self.player_auth.permissions.get(session['email']),action):raise Denied('Diese Aktion ist nicht freigegeben.')
-            if action in ('share-replay','revoke-replay'):
+            if action=='site-theme':
+                if player_scope or session['role'] not in ('owner','admin'):raise Denied('Nur Administratoren dürfen das Seitendesign ändern.')
+                from site_theme import save
+                save(Path(self.store.path).parent,obj.get('value'))
+                self.store.log(session['email'],action,value)
+                result='Seitendesign gespeichert.'
+            elif action in ('share-replay','revoke-replay'):
                 room_id=str(obj.get('session',''))
                 self.store.check_room(session,room_id)
                 key=self.server.replays.share(room_id,value,action=='revoke-replay')

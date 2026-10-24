@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Klassenkampf</title>
 <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/sketch.css">
-<link rel="stylesheet" href="/cookie-notice.css"><link rel="stylesheet" href="/avatars.css"></head>
+<link rel="stylesheet" href="/cookie-notice.css"><link rel="stylesheet" href="/avatars.css"><link rel="stylesheet" href="/site-theme.css"></head>
 <body class="booting" aria-busy="true">
 <section id="bootScreen" aria-label="Klassenkampf laden">
   <div class="boot-card"><img class="boot-logo" src="/lp-logo-small.webp" alt="LP" width="180" height="180" fetchpriority="high"><h1>KLASSENKAMPF</h1><div class="boot-spinner" aria-hidden="true"></div><p id="bootMessage" role="status">Verbindung wird hergestellt …</p><button id="bootRetry" class="btn mini" type="button" hidden>Erneut versuchen</button><noscript><p>Bitte JavaScript aktivieren, um mitzuspielen.</p></noscript></div>
@@ -15,9 +15,9 @@
 
 <!-- Login -->
 <div id="login" class="screen active">
-  <div class="autumn-mark" aria-hidden="true"><svg viewBox="0 0 100 86" width="64" height="56"><path d="M51 21q-5-14 7-18" fill="none" stroke="#a4b66e" stroke-width="7" stroke-linecap="round"/><path d="M51 24C17 3-8 65 25 77q12 6 25 1 13 5 27-1c32-13 7-74-26-53" fill="#de782f"/><ellipse cx="50" cy="51" rx="22" ry="30" fill="#ef9241"/><path d="m27 42 13-6-3 13zm46 0-13-6 3 13zM31 59l10 4 9-4 9 4 10-4q-18 25-38 0" fill="#322033"/></svg></div>
+  <div class="season-mark" aria-hidden="true"></div>
   <h1 class="logo">KLASSEN<span class="w">KAMPF</span></h1>
-  <div class="sub autumn-label">HALLOWEEN EDITION</div>
+  <div class="sub season-label" aria-hidden="true"></div>
   <div class="card">
     <h2>Sitzungscode eingeben</h2>
     <input id="codeInput" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC 234" aria-label="Sitzungscode">

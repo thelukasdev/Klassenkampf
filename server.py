@@ -778,6 +778,10 @@ class Server:
             await self._http_response(writer, 405, b'Method not allowed')
             return
         path = unquote(urlsplit(path).path)
+        if path == '/site-theme.css':
+            from site_theme import stylesheet
+            await self._http_response(writer,200,stylesheet(Path(self.web_admin.store.path).parent),content_type='text/css; charset=utf-8',head=method=='HEAD')
+            return
         if path.rstrip('/') in ('/impressum','/datenschutz'):
             from legal_pages import serve
             await serve(writer,method,path.strip('/'),Path(self.web_admin.store.path).parent);return
@@ -848,11 +852,11 @@ class Server:
         except ConnectionError:pass
         writer.close()
 
-    async def _http_response(self, writer, status, body, *, head=False):
+    async def _http_response(self, writer, status, body, *, head=False, content_type="application/json; charset=utf-8"):
         reason = {200: 'OK', 400: 'Bad Request', 401: 'Unauthorized',
                   403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed'}[status]
         writer.write((f'HTTP/1.1 {status} {reason}\r\nContent-Length: {len(body)}\r\n'
-                      'Content-Type: application/json; charset=utf-8\r\n'
+                      f'Content-Type: {content_type}\r\n'
                       'Cache-Control: no-store\r\nConnection: close\r\n\r\n').encode()
                      + (b'' if head else body))
         await writer.drain()
