@@ -46,12 +46,10 @@ class SessionDesignTests(unittest.IsolatedAsyncioTestCase):
         room._apply_state({'players':{},'design':{'background':'invalid'}})
         self.assertEqual(room.design,DEFAULT)
 
-class PreviewMetadataTests(unittest.TestCase):
-    def test_every_registered_game_has_small_local_preview_and_duration(self):
+class GameMetadataTests(unittest.TestCase):
+    def test_every_game_has_player_counts_and_estimated_duration(self):
         import games
         for item in games.GAME_INFO:
             self.assertGreaterEqual(item['max'],item['min'])
             self.assertTrue(item['duration'].endswith('Min.'))
-            path=Path(__file__).parents[1]/'static'/item['preview'].lstrip('/')
-            self.assertTrue(path.is_file());self.assertLess(path.stat().st_size,12000)
-            self.assertNotIn('<script',path.read_text())
+            self.assertNotIn('preview',item)
